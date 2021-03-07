@@ -28,12 +28,12 @@ use System\Models\Parameter;
  * - compile scss: Compile registered SCSS files only.
  * - compile lang: Compile registered Language files only.
  * - set build: Pull the latest stable build number from the update gateway and set it as the current build number.
- * - set project --projectId=<id>: Set the projectId for this october instance.
+ * - set project --projectId=<id>: Set the projectId for this winter instance.
  *
- * @package october\system
+ * @package wintercms\wn-system-module
  * @author Alexey Bobkov, Samuel Georges
  */
-class OctoberUtil extends Command
+class WinterUtil extends Command
 {
 
     use \Illuminate\Console\ConfirmableTrait;
@@ -41,12 +41,12 @@ class OctoberUtil extends Command
     /**
      * The console command name.
      */
-    protected $name = 'october:util';
+    protected $name = 'winter:util';
 
     /**
      * The console command description.
      */
-    protected $description = 'Utility commands for October';
+    protected $description = 'Utility commands for Winter';
 
     /**
      * Execute the console command.
@@ -58,7 +58,7 @@ class OctoberUtil extends Command
 
         $methods = preg_grep('/^util/', get_class_methods(get_called_class()));
         $list = array_map(function ($item) {
-            return "october:".snake_case($item, " ");
+            return "winter:".snake_case($item, " ");
         }, $methods);
 
         if (!$this->argument('name')) {
@@ -88,7 +88,7 @@ class OctoberUtil extends Command
     protected function getArguments()
     {
         return [
-            ['name', InputArgument::IS_ARRAY, 'The utility command to perform, For more info "http://wintercms.com/docs/console/commands#october-util-command".'],
+            ['name', InputArgument::IS_ARRAY, 'The utility command to perform, For more info "http://wintercms.com/docs/console/commands#winter-util-command".'],
         ];
     }
 
@@ -122,10 +122,10 @@ class OctoberUtil extends Command
 
         try {
             $build = UpdateManager::instance()->setBuildNumberManually();
-            $this->comment('*** October sets build: '.$build);
+            $this->comment('*** Winter sets build: '.$build);
         }
         catch (Exception $ex) {
-            $this->comment('*** You were kicked from #october by Ex: ('.$ex->getMessage().')');
+            $this->comment('*** Failed setting the build number manually ('.$ex->getMessage().')');
         }
 
         $this->comment('-');

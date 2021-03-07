@@ -15,28 +15,28 @@ use Symfony\Component\Console\Input\InputOption;
 use Exception;
 
 /**
- * Console command to install October.
+ * Console command to install Winter.
  *
- * This sets up October for the first time. It will prompt the user for several
+ * This sets up Winter for the first time. It will prompt the user for several
  * configuration items, including application URL and database config, and then
  * perform a database migration.
  *
- * @package october\system
+ * @package wintercms\wn-system-module
  * @author Alexey Bobkov, Samuel Georges
  */
-class OctoberInstall extends Command
+class WinterInstall extends Command
 {
     use \Illuminate\Console\ConfirmableTrait;
 
     /**
      * The console command name.
      */
-    protected $name = 'october:install';
+    protected $name = 'winter:install';
 
     /**
      * The console command description.
      */
-    protected $description = 'Set up October for the first time.';
+    protected $description = 'Set up Winter for the first time.';
 
     /**
      * @var Winter\Storm\Config\ConfigWriter
