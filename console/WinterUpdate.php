@@ -9,19 +9,18 @@ use Symfony\Component\Console\Input\InputOption;
  * Console command to perform a system update.
  *
  * This updates Winter CMS and all plugins, database and files. It uses the
- * October gateway to receive the files via a package manager, then saves
+ * Winter gateway to receive the files via a package manager, then saves
  * the latest build number to the system.
  *
- * @package october\system
+ * @package wintercms\wn-system-module
  * @author Alexey Bobkov, Samuel Georges
  */
-class OctoberUpdate extends Command
+class WinterUpdate extends Command
 {
-
     /**
      * The console command name.
      */
-    protected $name = 'october:update';
+    protected $name = 'winter:update';
 
     /**
      * The console command description.
@@ -33,7 +32,7 @@ class OctoberUpdate extends Command
      */
     public function handle()
     {
-        $this->output->writeln('<info>Updating October...</info>');
+        $this->output->writeln('<info>Updating Winter...</info>');
         $manager = UpdateManager::instance()->setNotesOutput($this->output);
         $forceUpdate = $this->option('force');
 
@@ -99,7 +98,7 @@ class OctoberUpdate extends Command
         /*
          * Run migrations
          */
-        $this->call('october:up');
+        $this->call('winter:up');
     }
 
     /**

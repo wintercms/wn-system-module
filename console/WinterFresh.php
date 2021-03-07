@@ -10,17 +10,17 @@ use Symfony\Component\Console\Input\InputOption;
  *
  * This removes the demo theme and plugin. A great way to start a fresh project!
  *
- * @package october\system
+ * @package wintercms\wn-system-module
  * @author Alexey Bobkov, Samuel Georges
  */
-class OctoberFresh extends Command
+class WinterFresh extends Command
 {
     use \Illuminate\Console\ConfirmableTrait;
 
     /**
      * The console command name.
      */
-    protected $name = 'october:fresh';
+    protected $name = 'winter:fresh';
 
     /**
      * The console command description.
@@ -39,7 +39,7 @@ class OctoberFresh extends Command
         $demoThemePath = themes_path().'/demo';
 
         if (File::exists($demoThemePath)) {
-            Artisan::call('plugin:remove', ['name' => 'October.Demo', '--force' => true]);
+            Artisan::call('plugin:remove', ['name' => 'Winter.Demo', '--force' => true]);
             File::deleteDirectory($demoThemePath);
 
             $this->info('Demo has been removed! Enjoy a fresh start.');
