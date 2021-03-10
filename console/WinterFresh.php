@@ -10,17 +10,17 @@ use Symfony\Component\Console\Input\InputOption;
  *
  * This removes the demo theme and plugin. A great way to start a fresh project!
  *
- * @package october\system
+ * @package winter\wn-system-module
  * @author Alexey Bobkov, Samuel Georges
  */
-class OctoberFresh extends Command
+class WinterFresh extends Command
 {
     use \Illuminate\Console\ConfirmableTrait;
 
     /**
      * The console command name.
      */
-    protected $name = 'october:fresh';
+    protected $name = 'winter:fresh';
 
     /**
      * The console command description.

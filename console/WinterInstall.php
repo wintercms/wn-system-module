@@ -8,38 +8,38 @@ use File;
 use Config;
 use Backend\Database\Seeds\SeedSetupAdmin;
 use System\Classes\UpdateManager;
-use October\Rain\Config\ConfigWriter;
+use Winter\Storm\Config\ConfigWriter;
 use Illuminate\Console\Command;
 use Illuminate\Encryption\Encrypter;
 use Symfony\Component\Console\Input\InputOption;
 use Exception;
 
 /**
- * Console command to install October.
+ * Console command to install Winter.
  *
- * This sets up October for the first time. It will prompt the user for several
+ * This sets up Winter for the first time. It will prompt the user for several
  * configuration items, including application URL and database config, and then
  * perform a database migration.
  *
- * @package october\system
+ * @package winter\wn-system-module
  * @author Alexey Bobkov, Samuel Georges
  */
-class OctoberInstall extends Command
+class WinterInstall extends Command
 {
     use \Illuminate\Console\ConfirmableTrait;
 
     /**
      * The console command name.
      */
-    protected $name = 'october:install';
+    protected $name = 'winter:install';
 
     /**
      * The console command description.
      */
-    protected $description = 'Set up October for the first time.';
+    protected $description = 'Set up Winter for the first time.';
 
     /**
-     * @var October\Rain\Config\ConfigWriter
+     * @var Winter\Storm\Config\ConfigWriter
      */
     protected $configWriter;
 
@@ -149,8 +149,8 @@ class OctoberInstall extends Command
     protected function askToInstallPlugins()
     {
         $chosenToInstall = [];
-        if ($this->confirm('Install the October.Drivers plugin?', false)) {
-            $chosenToInstall[] = 'October.Drivers';
+        if ($this->confirm('Install the Winter.Drivers plugin?', false)) {
+            $chosenToInstall[] = 'Winter.Drivers';
         }
         if ($this->confirm('Install the Rainlab.Builder plugin?', false)) {
             $chosenToInstall[] = 'Rainlab.Builder';

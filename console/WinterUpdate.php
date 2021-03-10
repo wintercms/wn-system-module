@@ -32,7 +32,7 @@ class OctoberUpdate extends Command
      */
     public function handle()
     {
-        $this->output->writeln('<info>Updating October...</info>');
+        $this->output->writeln('<info>Updating Winter...</info>');
         $manager = UpdateManager::instance()->setNotesOutput($this->output);
         $forceUpdate = $this->option('force');
 
@@ -98,7 +98,7 @@ class OctoberUpdate extends Command
         /*
          * Run migrations
          */
-        $this->call('october:up');
+        $this->call('winter:up');
     }
 
     /**
