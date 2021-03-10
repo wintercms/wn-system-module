@@ -39,12 +39,12 @@ class OctoberUtil extends Command
     /**
      * The console command name.
      */
-    protected $name = 'october:util';
+    protected $name = 'winter:util';
 
     /**
      * The console command description.
      */
-    protected $description = 'Utility commands for October';
+    protected $description = 'Utility commands for Winter';
 
     /**
      * Execute the console command.
@@ -56,7 +56,7 @@ class OctoberUtil extends Command
 
         $methods = preg_grep('/^util/', get_class_methods(get_called_class()));
         $list = array_map(function ($item) {
-            return "october:".snake_case($item, " ");
+            return "winter:".snake_case($item, " ");
         }, $methods);
 
         if (!$this->argument('name')) {
