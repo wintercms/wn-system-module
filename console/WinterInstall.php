@@ -338,7 +338,6 @@ class WinterInstall extends Command
 
     protected function displayIntro()
     {
-
         $message = [
             ".============================================================================.",
             "                                                                              ",
