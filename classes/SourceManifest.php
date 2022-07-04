@@ -1,9 +1,9 @@
 <?php namespace System\Classes;
 
-use Http;
-use Config;
-use ApplicationException;
 use Winter\Storm\Argon\Argon;
+use Winter\Storm\Exception\ApplicationException;
+use Winter\Storm\Support\Facades\Config;
+use Winter\Storm\Support\Facades\Http;
 
 /**
  * Reads and stores the Winter CMS source manifest information.
@@ -21,24 +21,24 @@ use Winter\Storm\Argon\Argon;
 class SourceManifest
 {
     /**
-     * @var string The URL to the source manifest
+     * The URL to the source manifest
      */
-    protected $source;
+    protected string $source;
 
     /**
-     * @var array Array of builds, keyed by build number, with files for keys and hashes for values.
+     * Array of builds, keyed by build number, with files for keys and hashes for values.
      */
-    protected $builds = [];
+    protected array $builds = [];
 
     /**
-     * @var array The version map where forks occurred.
+     * The version map where forks occurred.
      */
-    protected $forks;
+    protected array $forks = [];
 
     /**
-     * @var string The URL to the forked version manifest
+     * The URL to the forked version manifest
      */
-    protected $forksUrl;
+    protected string $forksUrl;
 
     /**
      * Constructor
@@ -168,7 +168,7 @@ class SourceManifest
      * Changes between builds are calculated and stored with the build. Builds are stored in order of semantic
      * versioning: ie. 1.1.1 > 1.1.0 > 1.0.468
      *
-     * @param integer $build Build number.
+     * @param string $build Build number.
      * @param FileManifest $manifest The file manifest to add as a build.
      */
     public function addBuild($build, FileManifest $manifest): void
