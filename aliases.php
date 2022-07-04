@@ -23,7 +23,7 @@ return [
     // 'File'      => Illuminate\Support\Facades\File::class,         // Replaced by Winter
     // 'Gate'      => Illuminate\Support\Facades\Gate::class,         // Currently unsupported in Winter
     'Hash'         => Illuminate\Support\Facades\Hash::class,
-    'Http'         => Illuminate\Support\Facades\Http::class,
+    // 'Http'         => Illuminate\Support\Facades\Http::class,      // Replaced by Winter
     // 'Js'        => Illuminate\Support\Js::class,                   // Currently unsupported in Winter
     'Lang'         => Illuminate\Support\Facades\Lang::class,
     'Log'          => Illuminate\Support\Facades\Log::class,
