@@ -1,33 +1,31 @@
 <?php namespace System;
 
-use Db;
-use App;
-use View;
-use Event;
-use Config;
-use Backend;
-use Request;
-use Validator;
-use BackendMenu;
-use BackendAuth;
-use SystemException;
+use Backend\Classes\WidgetManager;
+use Backend\Facades\Backend;
+use Backend\Facades\BackendMenu;
+use Backend\Facades\BackendAuth;
 use Backend\Models\UserRole;
-use System\Classes\MailManager;
+use System\Classes\CombineAssets;
 use System\Classes\ErrorHandler;
+use System\Classes\MailManager;
 use System\Classes\MarkupManager;
 use System\Classes\PluginManager;
 use System\Classes\SettingsManager;
 use System\Classes\UpdateManager;
-use System\Twig\Engine as TwigEngine;
 use System\Models\EventLog;
 use System\Models\MailSetting;
-use System\Classes\CombineAssets;
-use Backend\Classes\WidgetManager;
+use System\Twig\Engine as TwigEngine;
+use Winter\Storm\Exception\SystemException;
 use Winter\Storm\Support\ModuleServiceProvider;
+use Winter\Storm\Support\Facades\Config;
+use Winter\Storm\Support\Facades\Validator;
 use Winter\Storm\Router\Helper as RouterHelper;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Schema;
-use System\Classes\MixAssets;
+use Illuminate\Support\Facades\View;
 
 class ServiceProvider extends ModuleServiceProvider
 {

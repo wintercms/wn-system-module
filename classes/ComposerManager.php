@@ -15,18 +15,18 @@ class ComposerManager
 {
     use \Winter\Storm\Support\Traits\Singleton;
 
-    protected $namespacePool = [];
+    protected array $namespacePool = [];
 
-    protected $psr4Pool = [];
+    protected array $psr4Pool = [];
 
-    protected $classMapPool = [];
+    protected array $classMapPool = [];
 
-    protected $includeFilesPool = [];
+    protected array $includeFilesPool = [];
 
     /**
-     * @var Composer\Autoload\ClassLoader The primary composer instance.
+     * The primary composer instance.
      */
-    protected $loader;
+    protected \Composer\Autoload\ClassLoader $loader;
 
     public function init()
     {

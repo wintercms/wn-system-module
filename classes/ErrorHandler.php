@@ -1,13 +1,13 @@
 <?php namespace System\Classes;
 
-use View;
-use Config;
+use Throwable;
 use Cms\Classes\Theme;
 use Cms\Classes\Router;
 use Cms\Classes\Controller as CmsController;
-use Winter\Storm\Exception\ErrorHandler as ErrorHandlerBase;
-use Winter\Storm\Exception\SystemException;
+use Illuminate\Support\Facades\View;
 use Symfony\Component\HttpFoundation\Response;
+use Winter\Storm\Support\Facades\Config;
+use Winter\Storm\Exception\ErrorHandler as ErrorHandlerBase;
 
 /**
  * System Error Handler, this class handles application exception events.
@@ -17,23 +17,6 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class ErrorHandler extends ErrorHandlerBase
 {
-    /**
-     * @inheritDoc
-     */
-    // public function handleException(Exception $proposedException)
-    // {
-    //     // The Twig runtime error is not very useful
-    //     if (
-    //         $proposedException instanceof \Twig\Error\RuntimeError &&
-    //         ($previousException = $proposedException->getPrevious()) &&
-    //         (!$previousException instanceof CmsException)
-    //     ) {
-    //         $proposedException = $previousException;
-    //     }
-
-    //     return parent::handleException($proposedException);
-    // }
-
     /**
      * Looks up an error page using the CMS route "/error". If the route does not
      * exist, this function will use the error view found in the Cms module.
@@ -71,13 +54,17 @@ class ErrorHandler extends ErrorHandlerBase
 
     /**
      * Displays the detailed system exception page.
-     * @return View Object containing the error page.
+     *
+     * @return \Illuminate\View\View|string Object containing the error page.
      */
-    public function handleDetailedError($exception)
+    public function handleDetailedError(Throwable $exception)
     {
         // Ensure System view path is registered
         View::addNamespace('system', base_path().'/modules/system/views');
 
-        return View::make('system::exception', ['exception' => $exception]);
+        /** @var \Illuminate\View\View */
+        $view = View::make('system::exception', ['exception' => $exception]);
+
+        return $view;
     }
 }

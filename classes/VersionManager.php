@@ -1,10 +1,10 @@
 <?php namespace System\Classes;
 
-use File;
-use Yaml;
-use Db;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Winter\Storm\Database\Updater;
+use Winter\Storm\Support\Facades\Yaml;
+use Winter\Storm\Support\Facades\File;
 
 /**
  * Version manager
@@ -50,12 +50,12 @@ class VersionManager
     protected $databaseHistory;
 
     /**
-     * @var Winter\Storm\Database\Updater
+     * @var \Winter\Storm\Database\Updater
      */
     protected $updater;
 
     /**
-     * @var System\Classes\PluginManager
+     * @var \System\Classes\PluginManager
      */
     protected $pluginManager;
 
@@ -270,8 +270,9 @@ class VersionManager
 
     /**
      * Deletes all records from the version and history tables for a plugin.
+     *
      * @param string $pluginCode Plugin code
-     * @return void
+     * @return bool
      */
     public function purgePlugin($pluginCode)
     {
@@ -534,7 +535,7 @@ class VersionManager
      * Returns the last update history for a plugin.
      *
      * @param string $code The plugin identifier
-     * @return stdClass|null
+     * @return \Illuminate\Database\Eloquent\Model|object|static|null
      */
     protected function getLastHistory($code)
     {
@@ -578,7 +579,7 @@ class VersionManager
     /**
      * Raise a note event for the migrator.
      * @param string $message
-     * @return void
+     * @return static
      */
     protected function note($message)
     {
@@ -591,8 +592,8 @@ class VersionManager
 
     /**
      * Sets an output stream for writing notes.
-     * @param Illuminate\Console\Command $output
-     * @return self
+     * @param \Illuminate\Console\Command $output
+     * @return static
      */
     public function setNotesOutput($output)
     {
