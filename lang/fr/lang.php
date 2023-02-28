@@ -118,8 +118,8 @@ return [
         'missing_model' => 'La page de réglages nécessite la définition d\'un Model.',
         'update_success' => 'Les réglages pour :name ont étés mis à jour avec succès.',
         'test_subject' => 'Test du driver de courrier',
-        'test_content' => 'Il s\'agit d\'un e-mail de test pour confirmer que les paramètres de messagerie fournis fonctionnent.',
-        'test_confirm' => 'Cela permettra de sauvegarder votre configuration actuelle et d\'envoyer un e-mail de test à :email.',
+        'test_content' => "Il s'agit d'un e-mail de test pour confirmer que les paramètres de messagerie fournis fonctionnent.",
+        'test_confirm' => "Cela permettra de sauvegarder votre configuration actuelle et d'envoyer un e-mail de test à :email.",
         'return' => 'Retourner à la page des réglages du système',
         'search' => 'Rechercher'
     ],

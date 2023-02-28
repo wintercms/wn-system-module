@@ -60,7 +60,7 @@ return [
         'last_color' => 'Utiliser la couleur sélectionnée précédemment',
         'aria_palette' => 'Zone de sélection des couleurs',
         'aria_hue' => 'Curseur de sélection de la teinte',
-        'aria_opacity' => 'Curseur de sélection de l\'opacité',
+        'aria_opacity' => "Curseur de sélection de l'opacité",
     ],
     'filter' => [
         'group' => [
