@@ -307,7 +307,7 @@ class PackageManager
         }
 
         // Check that the package path exists
-        if (!File::exists($path)) {
+        if (!File::exists(base_path($path))) {
             throw new SystemException(sprintf(
                 'Cannot register "%s" as a compilable package; the "%s" path does not exist.',
                 $name,
@@ -318,7 +318,7 @@ class PackageManager
         $package = $path . '/package.json';
         $config = $path . DIRECTORY_SEPARATOR . $configFile;
 
-        if (!File::exists($config)) {
+        if (!File::exists(base_path($config))) {
             throw new SystemException(sprintf(
                 'Cannot register "%s" as a compilable package; the config file "%s" does not exist.',
                 $name,
