@@ -1,0 +1,344 @@
+<?php
+
+namespace System\Classes\Core;
+
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Lang;
+use System\Models\Parameter;
+use Winter\Storm\Exception\ApplicationException;
+use Winter\Storm\Network\Http as NetworkHttp;
+use Winter\Storm\Support\Facades\Config;
+use Winter\Storm\Support\Facades\File;
+use Winter\Storm\Support\Facades\Http;
+use Exception;
+use Winter\Storm\Support\Facades\Url;
+use Winter\Storm\Support\Traits\Singleton;
+
+/**
+ * @class MarketPlaceApi
+ * @method static array search(string $query, string $productType = '')
+ */
+class MarketPlaceApi
+{
+    use Singleton;
+    use UpdateManagerHelperTrait;
+
+    public const PRODUCT_CACHE_KEY = 'system-updates-product-details';
+
+    /**
+     * Cache of gateway products
+     */
+    protected array $productCache = [
+        'theme' => [],
+        'plugin' => []
+    ];
+
+    /**
+     * Secure API Key
+     */
+    protected ?string $key = null;
+
+    /**
+     * Secure API Secret
+     */
+    protected ?string $secret = null;
+
+    public function init()
+    {
+        if (Cache::has(static::PRODUCT_CACHE_KEY)) {
+            $this->productCache = Cache::get(static::PRODUCT_CACHE_KEY);
+        }
+    }
+
+    /**
+     * Set the API security for all transmissions.
+     */
+    public function setSecurity(string $key, string $secret): void
+    {
+        $this->key = $key;
+        $this->secret = $secret;
+    }
+
+    /**
+     * Contacts the update server for a response.
+     * @throws ApplicationException
+     */
+    public function requestServerData(string $uri, array $postData = []): array
+    {
+        $result = Http::post($this->createServerUrl($uri), function ($http) use ($postData) {
+            $this->applyHttpAttributes($http, $postData);
+        });
+
+        // @TODO: Refactor when marketplace API finalized
+        if ($result->body === 'Package not found') {
+            $result->code = 500;
+        }
+
+        if ($result->code == 404) {
+            throw new ApplicationException(Lang::get('system::lang.server.response_not_found'));
+        }
+
+        if ($result->code != 200) {
+            throw new ApplicationException(
+                strlen($result->body)
+                    ? $result->body
+                    : Lang::get('system::lang.server.response_empty')
+            );
+        }
+
+        try {
+            $resultData = json_decode($result->body, true, flags: JSON_THROW_ON_ERROR);
+        } catch (Exception $ex) {
+            throw new ApplicationException(Lang::get('system::lang.server.response_invalid'));
+        }
+
+        if ($resultData === false || (is_string($resultData) && !strlen($resultData))) {
+            throw new ApplicationException(Lang::get('system::lang.server.response_invalid'));
+        }
+
+        if (!is_array($resultData)) {
+            throw new ApplicationException(Lang::get('system::lang.server.response_invalid'));
+        }
+
+        return $resultData;
+    }
+
+    /**
+     * Downloads a file from the update server.
+     * @param $uri - Gateway API URI
+     * @param $fileCode - A unique code for saving the file.
+     * @param $expectedHash - The expected file hash of the file.
+     * @param $postData - Extra post data
+     * @throws ApplicationException
+     */
+    public function requestServerFile(string $uri, string $fileCode, string $expectedHash, array $postData = []): void
+    {
+        $filePath = $this->getFilePath($fileCode);
+
+        $result = Http::post($this->createServerUrl($uri), function ($http) use ($postData, $filePath) {
+            $this->applyHttpAttributes($http, $postData);
+            $http->toFile($filePath);
+        });
+
+        if ($result->code != 200) {
+            throw new ApplicationException(File::get($filePath));
+        }
+
+        if (md5_file($filePath) != $expectedHash) {
+            @unlink($filePath);
+            throw new ApplicationException(Lang::get('system::lang.server.file_corrupt'));
+        }
+    }
+
+    /**
+     * @param string $query The query to search for
+     * @param string $productType Either "plugin" or "theme"
+     * @return array
+     * @throws ApplicationException
+     */
+    public function search(string $query, string $productType = ''): array
+    {
+        $serverUri = $productType === 'plugin' ? 'plugin/search' : 'theme/search';
+
+        return $this->requestServerData($serverUri, ['query' => $query]);
+    }
+
+    public function requestProductDetails(array|string $codes, string $type = null): array
+    {
+        if (!in_array($type, ['plugin', 'theme'])) {
+            $type = 'plugin';
+        }
+
+        $codes = is_array($codes) ? $codes : [$codes];
+
+        /*
+         * New products requested
+         */
+        $productCodesNotInCache = array_diff($codes, array_keys($this->productCache[$type]));
+        if (count($productCodesNotInCache)) {
+            $data = $this->fetchProducts(
+                $type,
+                '/details',
+                'system-updates-products-' . crc32(implode(',', $productCodesNotInCache)),
+                ['names' => $productCodesNotInCache]
+            );
+
+            /*
+             * Cache unknown products
+             */
+            $unknownCodes = array_diff(
+                $productCodesNotInCache,
+                array_map(fn ($product) => array_get($product, 'code', -1), $data)
+            );
+
+            foreach ($unknownCodes as $code) {
+                $this->cacheProductDetail($type, $code, -1);
+            }
+
+            $this->saveProductCache();
+        }
+
+        /*
+         * Build details from cache
+         */
+        $result = [];
+        $requestedDetails = array_intersect_key($this->productCache[$type], array_flip($codes));
+
+        foreach ($requestedDetails as $detail) {
+            if ($detail === -1) {
+                continue;
+            }
+            $result[] = $detail;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Returns popular themes found on the marketplace.
+     */
+    public function requestPopularProducts(string $type = null): array
+    {
+        if (!in_array($type, ['plugin', 'theme'])) {
+            $type = 'plugin';
+        }
+
+        return $this->fetchProducts($type, '/popular', 'system-updates-popular-' . $type);
+    }
+
+    public function fetchProducts(string $type, string $url, string $cacheKey, array $postData = []): array
+    {
+        if (Cache::has($cacheKey)) {
+            return Cache::get($cacheKey);
+        }
+
+        $data = $this->requestServerData($type . $url);
+
+        Cache::put($cacheKey, $data, now()->addMinutes(60));
+
+        foreach ($data as $product) {
+            $code = array_get($product, 'code', -1);
+            $this->cacheProductDetail($type, $code, $product);
+        }
+
+        $this->saveProductCache();
+
+        return $data;
+    }
+
+    /**
+     * Returns the latest changelog information.
+     */
+    public function requestChangelog(): array
+    {
+        $build = Parameter::get('system::core.build');
+
+        // Determine branch
+        if (!is_null($build)) {
+            $branch = explode('.', $build);
+            array_pop($branch);
+            $branch = implode('.', $branch);
+        }
+
+        $result = Http::get($this->createServerUrl('changelog' . ((!is_null($branch)) ? '/' . $branch : '')));
+
+        if ($result->code == 404) {
+            throw new ApplicationException(Lang::get('system::lang.server.response_empty'));
+        }
+
+        if ($result->code != 200) {
+            throw new ApplicationException(
+                strlen($result->body)
+                    ? $result->body
+                    : Lang::get('system::lang.server.response_empty')
+            );
+        }
+
+        try {
+            $resultData = json_decode($result->body, true);
+        } catch (Exception $ex) {
+            throw new ApplicationException(Lang::get('system::lang.server.response_invalid'));
+        }
+
+        return $resultData;
+    }
+
+    /**
+     * Create a nonce based on millisecond time
+     */
+    protected function createNonce(): int
+    {
+        $mt = explode(' ', microtime());
+        return $mt[1] . substr($mt[0], 2, 6);
+    }
+
+    /**
+     * Create a unique signature for transmission.
+     */
+    protected function createSignature(array $data, string $secret): string
+    {
+        return base64_encode(hash_hmac('sha512', http_build_query($data, '', '&'), base64_decode($secret), true));
+    }
+
+    /**
+     * Create a complete gateway server URL from supplied URI
+     */
+    protected function createServerUrl(string $uri): string
+    {
+        $gateway = Config::get('cms.updateServer', 'https://api.wintercms.com/marketplace');
+
+        if (!str_ends_with($gateway, '/')) {
+            $gateway .= '/';
+        }
+
+        return $gateway . $uri;
+    }
+
+    protected function cacheProductDetail(string $type, string $code, array|int $data): void
+    {
+        $this->productCache[$type][$code] = $data;
+    }
+
+    protected function saveProductCache(): void
+    {
+        $expiresAt = Carbon::now()->addDays(2);
+        Cache::put(static::PRODUCT_CACHE_KEY, $this->productCache, $expiresAt);
+    }
+
+    /**
+     * Modifies the Network HTTP object with common attributes.
+     */
+    protected function applyHttpAttributes(NetworkHttp $http, array $postData): void
+    {
+        $postData['protocol_version'] = '1.1';
+        $postData['client'] = 'october';
+
+        $postData['server'] = base64_encode(serialize([
+            'php'   => PHP_VERSION,
+            'url'   => Url::to('/'),
+            'since' => Parameter::get('system::app.birthday'),
+        ]));
+
+        if ($projectId = Parameter::get('system::project.id')) {
+            $postData['project'] = $projectId;
+        }
+
+        if (Config::get('cms.edgeUpdates', false)) {
+            $postData['edge'] = 1;
+        }
+
+        if ($this->key && $this->secret) {
+            $postData['nonce'] = $this->createNonce();
+            $http->header('Rest-Key', $this->key);
+            $http->header('Rest-Sign', $this->createSignature($postData, $this->secret));
+        }
+
+        if ($credentials = Config::get('cms.updateAuth')) {
+            $http->auth($credentials);
+        }
+
+        $http->noRedirect();
+        $http->data($postData);
+    }
+}

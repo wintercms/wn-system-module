@@ -638,7 +638,7 @@ class VersionManager
 
     /**
      * Sets an output stream for writing notes.
-     * @param Illuminate\Console\Command $output
+     * @param \Illuminate\Console\OutputStyle $output
      * @return self
      */
     public function setNotesOutput($output)

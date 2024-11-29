@@ -11,21 +11,20 @@ use Illuminate\Console\View\Components\Info;
 use Illuminate\Database\Migrations\DatabaseMigrationRepository;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Lang;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use System\Classes\Core\MarketPlaceApi;
+use System\Classes\Core\UpdateManagerHelperTrait;
 use System\Helpers\Cache as CacheHelper;
 use System\Models\Parameter;
 use System\Models\PluginVersion;
 use Winter\Storm\Exception\ApplicationException;
 use Winter\Storm\Filesystem\Zip;
-use Winter\Storm\Network\Http as NetworkHttp;
 use Winter\Storm\Support\Facades\Config;
 use Winter\Storm\Support\Facades\File;
 use Winter\Storm\Support\Facades\Http;
 use Winter\Storm\Support\Facades\Schema;
-use Winter\Storm\Support\Facades\Url;
 
 /**
  * Update manager
@@ -38,12 +37,11 @@ use Winter\Storm\Support\Facades\Url;
 class UpdateManager
 {
     use \Winter\Storm\Support\Traits\Singleton;
+    use UpdateManagerHelperTrait;
 
     protected ?OutputStyle $notesOutput = null;
 
     protected string $baseDirectory;
-
-    protected string $tempDirectory;
 
     protected PluginManager $pluginManager;
 
@@ -51,25 +49,12 @@ class UpdateManager
 
     protected VersionManager $versionManager;
 
-    /**
-     * Secure API Key
-     */
-    protected ?string $key = null;
-
-    /**
-     * Secure API Secret
-     */
-    protected ?string $secret = null;
+    protected MarketPlaceApi $api;
 
     /**
      * If set to true, core updates will not be downloaded or extracted.
      */
     protected bool $disableCoreUpdates = false;
-
-    /**
-     * Cache of gateway products
-     */
-    protected array $productCache;
 
     protected Migrator $migrator;
 
@@ -85,6 +70,7 @@ class UpdateManager
      */
     protected function init()
     {
+        $this->api = MarketPlaceApi::instance();
         $this->pluginManager = PluginManager::instance();
         $this->themeManager = class_exists(ThemeManager::class) ? ThemeManager::instance() : null;
         $this->versionManager = VersionManager::instance();
@@ -106,7 +92,7 @@ class UpdateManager
      * the IoC container reboots. This provides a way to rebuild
      * for the purposes of unit testing.
      */
-    public function bindContainerObjects()
+    public function bindContainerObjects(): void
     {
         $this->migrator = App::make('migrator');
         $this->repository = App::make('migration.repository');
@@ -195,7 +181,7 @@ class UpdateManager
     /**
      * Checks for new updates and returns the amount of unapplied updates.
      * Only requests from the server at a set interval (retry timer).
-     * @param $force Ignore the retry timer.
+     * @param bool $force Ignore the retry timer.
      */
     public function check(bool $force = false): int
     {
@@ -235,7 +221,7 @@ class UpdateManager
 
     /**
      * Requests an update list used for checking for new updates.
-     * @param $force Request application and plugins hash list regardless of version.
+     * @param bool $force Request application and plugins hash list regardless of version.
      */
     public function requestUpdateList(bool $force = false): array
     {
@@ -260,7 +246,7 @@ class UpdateManager
             'force'   => $force
         ];
 
-        $result = $this->requestServerData('core/update', $params);
+        $result = $this->api->requestServerData('core/update', $params);
         $updateCount = (int) array_get($result, 'update', 0);
 
         /*
@@ -333,7 +319,7 @@ class UpdateManager
      */
     public function requestProjectDetails(string $projectId): array
     {
-        return $this->requestServerData('project/detail', ['id' => $projectId]);
+        return $this->api->requestServerData('project/detail', ['id' => $projectId]);
     }
 
     /**
@@ -389,7 +375,7 @@ class UpdateManager
      *                  to the code = less confidence.
      *  - `changes`: If $detailed is true, this will include the list of files modified, created and deleted.
      *
-     * @param $detailed If true, the list of files modified, added and deleted will be included in the result.
+     * @param bool $detailed If true, the list of files modified, added and deleted will be included in the result.
      */
     public function getBuildNumberManually(bool $detailed = false): array
     {
@@ -403,7 +389,7 @@ class UpdateManager
     /**
      * Sets the build number in the database.
      *
-     * @param $detailed If true, the list of files modified, added and deleted will be included in the result.
+     * @param bool $detailed If true, the list of files modified, added and deleted will be included in the result.
      */
     public function setBuildNumberManually(bool $detailed = false): array
     {
@@ -474,11 +460,11 @@ class UpdateManager
 
     /**
      * Downloads the core from the update server.
-     * @param $hash Expected file hash.
+     * @param string $hash Expected file hash.
      */
     public function downloadCore(string $hash): void
     {
-        $this->requestServerFile('core/get', 'core', $hash, ['type' => 'update']);
+        $this->api->requestServerFile('core/get', 'core', $hash, ['type' => 'update']);
     }
 
     /**
@@ -517,7 +503,7 @@ class UpdateManager
      */
     public function requestPluginDetails(string $name): array
     {
-        return $this->requestServerData('plugin/detail', ['name' => $name]);
+        return $this->api->requestServerData('plugin/detail', ['name' => $name]);
     }
 
     /**
@@ -525,7 +511,7 @@ class UpdateManager
      */
     public function requestPluginContent(string $name): array
     {
-        return $this->requestServerData('plugin/content', ['name' => $name]);
+        return $this->api->requestServerData('plugin/content', ['name' => $name]);
     }
 
     /**
@@ -554,7 +540,8 @@ class UpdateManager
     /**
      * Rollback an existing plugin
      *
-     * @param $stopOnVersion If this parameter is specified, the process stops once the provided version number is reached
+     * @param string|null $stopOnVersion If this parameter is specified, the process stops once the provided version number is reached
+     * @throws ApplicationException if the provided stopOnVersion cannot be found in the database
      */
     public function rollbackPlugin(string $name, string $stopOnVersion = null): static
     {
@@ -593,12 +580,12 @@ class UpdateManager
 
     /**
      * Downloads a plugin from the update server.
-     * @param $installation Indicates whether this is a plugin installation request.
+     * @param bool $installation Indicates whether this is a plugin installation request.
      */
     public function downloadPlugin(string $name, string $hash, bool $installation = false): static
     {
         $fileCode = $name . $hash;
-        $this->requestServerFile('plugin/get', $fileCode, $hash, [
+        $this->api->requestServerFile('plugin/get', $fileCode, $hash, [
             'name'         => $name,
             'installation' => $installation ? 1 : 0
         ]);
@@ -625,7 +612,7 @@ class UpdateManager
      */
     public function requestThemeDetails(string $name): array
     {
-        return $this->requestServerData('theme/detail', ['name' => $name]);
+        return $this->api->requestServerData('theme/detail', ['name' => $name]);
     }
 
     /**
@@ -634,7 +621,7 @@ class UpdateManager
     public function downloadTheme(string $name, string $hash): static
     {
         $fileCode = $name . $hash;
-        $this->requestServerFile('theme/get', $fileCode, $hash, ['name' => $name]);
+        $this->api->requestServerFile('theme/get', $fileCode, $hash, ['name' => $name]);
         return $this;
     }
 
@@ -654,167 +641,12 @@ class UpdateManager
     }
 
     //
-    // Products
-    //
-
-    public function requestProductDetails($codes, $type = null): array
-    {
-        if ($type != 'plugin' && $type != 'theme') {
-            $type = 'plugin';
-        }
-
-        $codes = (array) $codes;
-        $this->loadProductDetailCache();
-
-        /*
-         * New products requested
-         */
-        $newCodes = array_diff($codes, array_keys($this->productCache[$type]));
-        if (count($newCodes)) {
-            $dataCodes = [];
-            $data = $this->requestServerData($type . '/details', ['names' => $newCodes]);
-            foreach ($data as $product) {
-                $code = array_get($product, 'code', -1);
-                $this->cacheProductDetail($type, $code, $product);
-                $dataCodes[] = $code;
-            }
-
-            /*
-             * Cache unknown products
-             */
-            $unknownCodes = array_diff($newCodes, $dataCodes);
-            foreach ($unknownCodes as $code) {
-                $this->cacheProductDetail($type, $code, -1);
-            }
-
-            $this->saveProductDetailCache();
-        }
-
-        /*
-         * Build details from cache
-         */
-        $result = [];
-        $requestedDetails = array_intersect_key($this->productCache[$type], array_flip($codes));
-
-        foreach ($requestedDetails as $detail) {
-            if ($detail === -1) {
-                continue;
-            }
-            $result[] = $detail;
-        }
-
-        return $result;
-    }
-
-    /**
-     * Returns popular themes found on the marketplace.
-     */
-    public function requestPopularProducts(string $type = null): array
-    {
-        if ($type != 'plugin' && $type != 'theme') {
-            $type = 'plugin';
-        }
-
-        $cacheKey = 'system-updates-popular-' . $type;
-
-        if (Cache::has($cacheKey)) {
-            return @unserialize(@base64_decode(Cache::get($cacheKey))) ?: [];
-        }
-
-        $data = $this->requestServerData($type . '/popular');
-        $expiresAt = now()->addMinutes(60);
-        Cache::put($cacheKey, base64_encode(serialize($data)), $expiresAt);
-
-        foreach ($data as $product) {
-            $code = array_get($product, 'code', -1);
-            $this->cacheProductDetail($type, $code, $product);
-        }
-
-        $this->saveProductDetailCache();
-
-        return $data;
-    }
-
-    protected function loadProductDetailCache(): void
-    {
-        $defaultCache = ['theme' => [], 'plugin' => []];
-        $cacheKey = 'system-updates-product-details';
-
-        if (Cache::has($cacheKey)) {
-            $this->productCache = @unserialize(@base64_decode(Cache::get($cacheKey))) ?: $defaultCache;
-        } else {
-            $this->productCache = $defaultCache;
-        }
-    }
-
-    protected function saveProductDetailCache(): void
-    {
-        if ($this->productCache === null) {
-            $this->loadProductDetailCache();
-        }
-
-        $cacheKey = 'system-updates-product-details';
-        $expiresAt = Carbon::now()->addDays(2);
-        Cache::put($cacheKey, base64_encode(serialize($this->productCache)), $expiresAt);
-    }
-
-    protected function cacheProductDetail(string $type, string $code, array|int $data): void
-    {
-        if ($this->productCache === null) {
-            $this->loadProductDetailCache();
-        }
-
-        $this->productCache[$type][$code] = $data;
-    }
-
-    //
-    // Changelog
-    //
-
-    /**
-     * Returns the latest changelog information.
-     */
-    public function requestChangelog(): array
-    {
-        $build = Parameter::get('system::core.build');
-
-        // Determine branch
-        if (!is_null($build)) {
-            $branch = explode('.', $build);
-            array_pop($branch);
-            $branch = implode('.', $branch);
-        }
-
-        $result = Http::get($this->createServerUrl('changelog' . ((!is_null($branch)) ? '/' . $branch : '')));
-
-        if ($result->code == 404) {
-            throw new ApplicationException(Lang::get('system::lang.server.response_empty'));
-        }
-
-        if ($result->code != 200) {
-            throw new ApplicationException(
-                strlen($result->body)
-                ? $result->body
-                : Lang::get('system::lang.server.response_empty')
-            );
-        }
-
-        try {
-            $resultData = json_decode($result->body, true);
-        } catch (Exception $ex) {
-            throw new ApplicationException(Lang::get('system::lang.server.response_invalid'));
-        }
-
-        return $resultData;
-    }
-
-    //
     // Notes
     //
 
     /**
      * Writes output to the console using a Laravel CLI View component.
-     * @param $component Class extending \Illuminate\Console\View\Components\Component to be used to render the message
+     * @param string $component Class extending \Illuminate\Console\View\Components\Component to be used to render the message
      */
     protected function write(string $component, ...$arguments): static
     {
@@ -847,165 +679,6 @@ class UpdateManager
         return $this;
     }
 
-    //
-    // Gateway access
-    //
-
-    /**
-     * Contacts the update server for a response.
-     */
-    public function requestServerData(string $uri, array $postData = []): array
-    {
-        $result = Http::post($this->createServerUrl($uri), function ($http) use ($postData) {
-            $this->applyHttpAttributes($http, $postData);
-        });
-
-        // @TODO: Refactor when marketplace API finalized
-        if ($result->body === 'Package not found') {
-            $result->code = 500;
-        }
-
-        if ($result->code == 404) {
-            throw new ApplicationException(Lang::get('system::lang.server.response_not_found'));
-        }
-
-        if ($result->code != 200) {
-            throw new ApplicationException(
-                strlen($result->body)
-                ? $result->body
-                : Lang::get('system::lang.server.response_empty')
-            );
-        }
-
-        $resultData = false;
-
-        try {
-            $resultData = @json_decode($result->body, true);
-        } catch (Exception $ex) {
-            throw new ApplicationException(Lang::get('system::lang.server.response_invalid'));
-        }
-
-        if ($resultData === false || (is_string($resultData) && !strlen($resultData))) {
-            throw new ApplicationException(Lang::get('system::lang.server.response_invalid'));
-        }
-
-        if (!is_array($resultData)) {
-            throw new ApplicationException(Lang::get('system::lang.server.response_invalid'));
-        }
-
-        return $resultData;
-    }
-
-    /**
-     * Downloads a file from the update server.
-     * @param $uri Gateway API URI
-     * @param $fileCode A unique code for saving the file.
-     * @param $expectedHash The expected file hash of the file.
-     * @param $postData Extra post data
-     */
-    public function requestServerFile(string $uri, string $fileCode, string $expectedHash, array $postData = []): void
-    {
-        $filePath = $this->getFilePath($fileCode);
-
-        $result = Http::post($this->createServerUrl($uri), function ($http) use ($postData, $filePath) {
-            $this->applyHttpAttributes($http, $postData);
-            $http->toFile($filePath);
-        });
-
-        if ($result->code != 200) {
-            throw new ApplicationException(File::get($filePath));
-        }
-
-        if (md5_file($filePath) != $expectedHash) {
-            @unlink($filePath);
-            throw new ApplicationException(Lang::get('system::lang.server.file_corrupt'));
-        }
-    }
-
-    /**
-     * Calculates a file path for a file code
-     */
-    protected function getFilePath(string $fileCode): string
-    {
-        $name = md5($fileCode) . '.arc';
-        return $this->tempDirectory . '/' . $name;
-    }
-
-    /**
-     * Set the API security for all transmissions.
-     */
-    public function setSecurity(string $key, string $secret): void
-    {
-        $this->key = $key;
-        $this->secret = $secret;
-    }
-
-    /**
-     * Create a complete gateway server URL from supplied URI
-     */
-    protected function createServerUrl(string $uri): string
-    {
-        $gateway = Config::get('cms.updateServer', 'https://api.wintercms.com/marketplace');
-        if (substr($gateway, -1) != '/') {
-            $gateway .= '/';
-        }
-
-        return $gateway . $uri;
-    }
-
-    /**
-     * Modifies the Network HTTP object with common attributes.
-     */
-    protected function applyHttpAttributes(NetworkHttp $http, array $postData): void
-    {
-        $postData['protocol_version'] = '1.1';
-        $postData['client'] = 'october';
-
-        $postData['server'] = base64_encode(serialize([
-            'php'   => PHP_VERSION,
-            'url'   => Url::to('/'),
-            'since' => Parameter::get('system::app.birthday'),
-        ]));
-
-        if ($projectId = Parameter::get('system::project.id')) {
-            $postData['project'] = $projectId;
-        }
-
-        if (Config::get('cms.edgeUpdates', false)) {
-            $postData['edge'] = 1;
-        }
-
-        if ($this->key && $this->secret) {
-            $postData['nonce'] = $this->createNonce();
-            $http->header('Rest-Key', $this->key);
-            $http->header('Rest-Sign', $this->createSignature($postData, $this->secret));
-        }
-
-        if ($credentials = Config::get('cms.updateAuth')) {
-            $http->auth($credentials);
-        }
-
-        $http->noRedirect();
-        $http->data($postData);
-    }
-
-    /**
-     * Create a nonce based on millisecond time
-     */
-    protected function createNonce(): int
-    {
-        $mt = explode(' ', microtime());
-        return $mt[1] . substr($mt[0], 2, 6);
-    }
-
-    /**
-     * Create a unique signature for transmission.
-     */
-    protected function createSignature(array $data, string $secret): string
-    {
-        return base64_encode(hash_hmac('sha512', http_build_query($data, '', '&'), base64_decode($secret), true));
-    }
-
     public function getMigrationTableName(): string
     {
         return Config::get('database.migrations', 'migrations');
@@ -1030,7 +703,7 @@ class UpdateManager
         if (is_string($message)) {
             $this->messages[$class][] = $message;
         } elseif (is_array($message)) {
-            array_merge($this->messages[$class], $message);
+            $this->messages[$class] = array_merge($this->messages[$class], $message);
         }
     }
 

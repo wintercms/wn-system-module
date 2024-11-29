@@ -13,6 +13,8 @@ use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Storage;
+use System\Classes\Core\MarketPlaceApi;
 use System\Classes\PluginManager;
 use System\Classes\SettingsManager;
 use System\Classes\UpdateManager;
@@ -21,6 +23,7 @@ use System\Models\PluginVersion;
 use Winter\Storm\Database\Model;
 use Winter\Storm\Database\Models\DeferredBinding;
 use Winter\Storm\Exception\ApplicationException;
+use Winter\Storm\Support\Facades\File as FileHelper;
 use Winter\Storm\Support\Facades\File;
 use Winter\Storm\Support\Facades\Flash;
 use Winter\Storm\Support\Facades\Html;
@@ -251,7 +254,7 @@ class Updates extends Controller
      * - frozen - Frozen by the user
      * - positive - Default CSS class
      *
-     * @see Backend\Behaviors\ListController
+     * @see \Backend\Behaviors\ListController
      */
     public function listInjectRowClass($record, $definition = null): string
     {
@@ -798,9 +801,12 @@ class Updates extends Controller
         try {
             // Get the deferred binding record for the uploaded file
             $widget = $this->getPackageUploadWidget();
-            $class = Str::before(get_class($widget->model), chr(0));
+            $class = str_contains($class = Str::before(get_class($widget->model), chr(0)), '\\\\')
+                ? str_replace('\\\\', '\\', $class)
+                : $class;
+
             $deferred = DeferredBinding::query()
-                ->where('master_type', 'LIKE', str_replace('\\', '\\\\', $class) . '%')
+                ->where('master_type', 'LIKE', $class . '%')
                 ->where('master_field', 'uploaded_package')
                 ->where('session_key', $widget->getSessionKey())
                 ->first();
@@ -809,7 +815,12 @@ class Updates extends Controller
             if (!$deferred || !$deferred->slave) {
                 throw new ApplicationException(Lang::get('system::lang.server.response_invalid'));
             }
+
             $file = $deferred->slave;
+            $localPath = $file->disk_name;
+            if (!FileHelper::copyBetweenDisks($file->getDisk(), 'temp', $file->getDiskPath(), $localPath)) {
+                throw new ApplicationException(Lang::get('system::lang.server.shit_gone_fucky'));
+            }
 
             /**
              * @TODO:
@@ -821,7 +832,7 @@ class Updates extends Controller
 
             $manager = UpdateManager::instance();
 
-            $result = $manager->installUploadedPlugin();
+            $result = $manager->installUploadedPlugin(Storage::disk('temp')->path($localPath));
 
             if (!isset($result['code']) || !isset($result['hash'])) {
                 throw new ApplicationException(Lang::get('system::lang.server.response_invalid'));
@@ -1041,45 +1052,47 @@ class Updates extends Controller
     // Product install
     //
 
+    /**
+     * @return array
+     * @throws ApplicationException
+     */
     public function onSearchProducts(): array
     {
-        $searchType = get('search', 'plugins');
-        $serverUri = $searchType == 'plugins' ? 'plugin/search' : 'theme/search';
+        $searchType = get('search', 'plugins') === 'plugins' ? 'plugin' : 'theme';
 
-        $manager = UpdateManager::instance();
-        return $manager->requestServerData($serverUri, ['query' => get('query')]);
+        return MarketPlaceApi::instance()->search(get('query'), $searchType);
     }
 
     public function onGetPopularPlugins(): array
     {
-        $installed = $this->getInstalledPlugins();
-        $popular = UpdateManager::instance()->requestPopularProducts('plugin');
-        $popular = $this->filterPopularProducts($popular, $installed);
-
-        return ['result' => $popular];
+        return [
+            'result' => $this->filterPopularProducts(
+                MarketPlaceApi::instance()->requestPopularProducts('plugin'),
+                $this->getInstalledPlugins()
+            )
+        ];
     }
 
     public function onGetPopularThemes(): array
     {
-        $installed = $this->getInstalledThemes();
-        $popular = UpdateManager::instance()->requestPopularProducts('theme');
-        $popular = $this->filterPopularProducts($popular, $installed);
-
-        return ['result' => $popular];
+        return [
+            'result' => $this->filterPopularProducts(
+                MarketPlaceApi::instance()->requestPopularProducts('theme'),
+                $this->getInstalledThemes()
+            )
+        ];
     }
 
     protected function getInstalledPlugins(): array
     {
         $installed = PluginVersion::lists('code');
-        $manager = UpdateManager::instance();
-        return $manager->requestProductDetails($installed, 'plugin');
+        return MarketPlaceApi::instance()->requestProductDetails($installed, 'plugin');
     }
 
     protected function getInstalledThemes(): array
     {
         $history = Parameter::get('system::theme.history', []);
-        $manager = UpdateManager::instance();
-        $installed = $manager->requestProductDetails(array_keys($history), 'theme');
+        $installed = MarketPlaceApi::instance()->requestProductDetails(array_keys($history), 'theme');
 
         /*
          * Splice in the directory names
