@@ -1,6 +1,6 @@
 <?php
 
-namespace System\Classes;
+namespace System\Classes\Extensions;
 
 use Backend\Classes\NavigationManager;
 use FilesystemIterator;
@@ -10,8 +10,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\View;
+use InvalidArgumentException;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use System\Classes\ComposerManager;
+use System\Classes\SettingsManager;
+use System\Classes\UpdateManager;
 use System\Models\PluginVersion;
 use Winter\Storm\Exception\SystemException;
 use Winter\Storm\Foundation\Application;
@@ -26,7 +30,7 @@ use Winter\Storm\Support\Str;
  * @package winter\wn-system-module
  * @author Alexey Bobkov, Samuel Georges
  */
-class PluginManager
+class PluginManager implements ExtensionManager
 {
     use \Winter\Storm\Support\Traits\Singleton;
 
@@ -801,7 +805,7 @@ class PluginManager
         $record = PluginVersion::where('code', $plugin)->first();
 
         if (!$record) {
-            throw new \InvalidArgumentException("$plugin was not found in the database.");
+            throw new InvalidArgumentException("$plugin was not found in the database.");
         }
 
         return $this->pluginRecords[$plugin] = $record;
@@ -1034,6 +1038,41 @@ class PluginManager
         return $this->plugins = $sortedPlugins;
     }
 
+    /**
+     * Get a list of warnings about the current system status
+     * Warns when plugins are missing dependencies and when replaced plugins are still present on the system.
+     */
+    public function getWarnings(): array
+    {
+        $warnings = [];
+        $missingDependencies = $this->findMissingDependencies();
+
+        if (!empty($missingDependencies)) {
+            $this->clearFlagCache();
+        }
+
+        foreach ($missingDependencies as $pluginCode => $plugin) {
+            foreach ($plugin as $missingPluginCode) {
+                $warnings[] = Lang::get('system::lang.updates.update_warnings_plugin_missing', [
+                    'code' => '<strong>' . $missingPluginCode . '</strong>',
+                    'parent_code' => '<strong>' . $pluginCode . '</strong>'
+                ]);
+            }
+        }
+
+        $replacementMap = $this->getReplacementMap();
+        foreach ($replacementMap as $alias => $plugin) {
+            if ($this->getActiveReplacementMap($alias)) {
+                $warnings[] = Lang::get('system::lang.updates.update_warnings_plugin_replace', [
+                    'plugin' => '<strong>' . $plugin . '</strong>',
+                    'alias' => '<strong>' . $alias . '</strong>'
+                ]);
+            }
+        }
+
+        return $warnings;
+    }
+
     //
     // Management
     //
@@ -1070,5 +1109,50 @@ class PluginManager
         $manager = UpdateManager::instance();
         $manager->rollbackPlugin($id);
         $manager->updatePlugin($id);
+    }
+
+    public function list(): array
+    {
+        // TODO: Implement list() method.
+    }
+
+    public function create(): WinterExtension
+    {
+        // TODO: Implement create() method.
+    }
+
+    public function install(WinterExtension|string $extension): WinterExtension
+    {
+        // TODO: Implement install() method.
+    }
+
+    public function enable(WinterExtension|string $extension): mixed
+    {
+        // TODO: Implement enable() method.
+    }
+
+    public function disable(WinterExtension|string $extension): mixed
+    {
+        // TODO: Implement disable() method.
+    }
+
+    public function update(WinterExtension|string $extension): mixed
+    {
+        // TODO: Implement update() method.
+    }
+
+    public function refresh(WinterExtension|string $extension): mixed
+    {
+        // TODO: Implement refresh() method.
+    }
+
+    public function rollback(WinterExtension|string $extension, string $targetVersion): mixed
+    {
+        // TODO: Implement rollback() method.
+    }
+
+    public function uninstall(WinterExtension|string $extension): mixed
+    {
+        // TODO: Implement uninstall() method.
     }
 }

@@ -2,16 +2,16 @@
 
 namespace System\Tests\Bootstrap;
 
-use Mail;
-use Config;
 use Artisan;
-use Exception;
-use ReflectionClass;
 use Backend\Classes\AuthManager;
 use Backend\Tests\Concerns\InteractsWithAuthentication;
+use Config;
+use Exception;
+use Mail;
 use Mockery\MockInterface;
-use System\Classes\PluginBase;
-use System\Classes\PluginManager;
+use ReflectionClass;
+use System\Classes\Extensions\PluginBase;
+use System\Classes\Extensions\PluginManager;
 use System\Classes\UpdateManager;
 use Winter\Storm\Database\Model as BaseModel;
 

@@ -1,14 +1,19 @@
-<?php namespace System\Classes;
+<?php namespace System\Classes\Extensions;
 
-use Str;
-use File;
-use Yaml;
-use Backend;
-use ReflectionClass;
-use SystemException;
+use Backend\Facades\Backend;
 use Composer\Semver\Semver;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\ServiceProvider as ServiceProviderBase;
+use ReflectionClass;
+use System\Classes\VersionManager;
+use System\Classes\VersionYamlProcessor;
+use Winter\Storm\Exception\SystemException;
+use Winter\Storm\Foundation\Application;
+use Winter\Storm\Support\Facades\File;
+use Winter\Storm\Support\Facades\Html;
+use Winter\Storm\Support\Facades\Markdown;
+use Winter\Storm\Support\Facades\Yaml;
+use Winter\Storm\Support\Str;
 
 /**
  * Plugin base class
@@ -16,10 +21,10 @@ use Illuminate\Support\ServiceProvider as ServiceProviderBase;
  * @package winter\wn-system-module
  * @author Alexey Bobkov, Samuel Georges
  */
-class PluginBase extends ServiceProviderBase
+abstract class PluginBase extends ServiceProviderBase implements WinterExtension
 {
     /**
-     * @var \Winter\Storm\Foundation\Application The application instance.
+     * @var Application The application instance.
      */
     protected $app;
 
@@ -136,6 +141,8 @@ class PluginBase extends ServiceProviderBase
 
             return $navigation;
         }
+
+        return [];
     }
 
     /**
@@ -159,6 +166,8 @@ class PluginBase extends ServiceProviderBase
 
             return $quickActions;
         }
+
+        return [];
     }
 
     /**
@@ -172,6 +181,8 @@ class PluginBase extends ServiceProviderBase
         if (array_key_exists('permissions', $configuration)) {
             return $configuration['permissions'];
         }
+
+        return [];
     }
 
     /**
@@ -185,6 +196,8 @@ class PluginBase extends ServiceProviderBase
         if (array_key_exists('settings', $configuration)) {
             return $configuration['settings'];
         }
+
+        return [];
     }
 
     /**
@@ -478,6 +491,30 @@ class PluginBase extends ServiceProviderBase
     }
 
     /**
+     * Returns the requested plugin markdown file parsed into sanitized HTML
+     */
+    public function getPluginMarkdownFile(string|array $filename): ?string
+    {
+        $path = $this->getPluginPath();
+        $contents = null;
+        $filenames = is_array($filename) ? $filename : [$filename];
+        foreach ($filenames as $file) {
+            if (!File::exists($path . '/' . $file)) {
+                continue;
+            }
+
+            $contents = File::get($path . '/' . $file);
+
+            // Parse markdown, clean HTML, remove first H1 tag
+            $contents = Markdown::parse($contents);
+            $contents = Html::clean($contents);
+            $contents = preg_replace('@<h1[^>]*?>.*?<\/h1>@si', '', $contents, 1);
+        }
+
+        return $contents;
+    }
+
+    /**
      * Verifies the plugin's dependencies are present and enabled
      */
     public function checkDependencies(PluginManager $manager): bool
@@ -496,5 +533,47 @@ class PluginBase extends ServiceProviderBase
         }
 
         return true;
+    }
+
+    public function install(): static
+    {
+        // TODO: Implement install() method.
+        return $this;
+    }
+
+    public function uninstall(): static
+    {
+        // TODO: Implement uninstall() method.
+        return $this;
+    }
+
+    public function enable(): static
+    {
+        // TODO: Implement enable() method.
+        return $this;
+    }
+
+    public function disable(): static
+    {
+        // TODO: Implement disable() method.
+        return $this;
+    }
+
+    public function rollback(): static
+    {
+        // TODO: Implement rollback() method.
+        return $this;
+    }
+
+    public function refresh(): static
+    {
+        // TODO: Implement refresh() method.
+        return $this;
+    }
+
+    public function update(): static
+    {
+        // TODO: Implement update() method.
+        return $this;
     }
 }

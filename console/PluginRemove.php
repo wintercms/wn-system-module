@@ -1,9 +1,9 @@
 <?php namespace System\Console;
 
 use File;
-use Winter\Storm\Console\Command;
+use System\Classes\Extensions\PluginManager;
 use System\Classes\UpdateManager;
-use System\Classes\PluginManager;
+use Winter\Storm\Console\Command;
 
 /**
  * Console command to remove a plugin.

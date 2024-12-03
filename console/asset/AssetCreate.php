@@ -8,7 +8,7 @@ use Symfony\Component\Console\Input\InputOption;
 use System\Classes\Asset\BundleManager;
 use System\Classes\Asset\PackageJson;
 use System\Classes\Asset\PackageManager;
-use System\Classes\PluginManager;
+use System\Classes\Extensions\PluginManager;
 use Winter\Storm\Console\Command;
 use Winter\Storm\Support\Facades\File;
 

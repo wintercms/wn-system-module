@@ -1,9 +1,9 @@
 <?php namespace System\Console;
 
-use Winter\Storm\Console\Command;
+use System\Classes\Extensions\PluginManager;
 use System\Classes\UpdateManager;
-use System\Classes\PluginManager;
 use Throwable;
+use Winter\Storm\Console\Command;
 use Winter\Storm\Support\Facades\File;
 use Winter\Storm\Support\Str;
 

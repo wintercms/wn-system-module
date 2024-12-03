@@ -22,16 +22,21 @@ use Winter\Storm\Support\Traits\Singleton;
 class MarketPlaceApi
 {
     use Singleton;
-    use UpdateManagerHelperTrait;
+    use UpdateManagerFileSystemTrait;
 
     public const PRODUCT_CACHE_KEY = 'system-updates-product-details';
+
+    public const REQUEST_PLUGIN_DETAIL = 'plugin/detail';
+    public const REQUEST_PLUGIN_CONTENT = 'plugin/content';
+    public const REQUEST_THEME_DETAIL = 'theme/detail';
+    public const REQUEST_PROJECT_DETAIL = 'project/detail';
 
     /**
      * Cache of gateway products
      */
     protected array $productCache = [
         'theme' => [],
-        'plugin' => []
+        'plugin' => [],
     ];
 
     /**
@@ -49,6 +54,8 @@ class MarketPlaceApi
         if (Cache::has(static::PRODUCT_CACHE_KEY)) {
             $this->productCache = Cache::get(static::PRODUCT_CACHE_KEY);
         }
+
+        $this->setTempDirectory(temp_path());
     }
 
     /**
@@ -61,10 +68,37 @@ class MarketPlaceApi
     }
 
     /**
+     * Handles fetching data for system info stuff maybe
+     *
+     * @param string $request
+     * @param string $identifier
+     * @return array
+     * @throws ApplicationException
+     */
+    public function request(string $request, string $identifier): array
+    {
+        if (
+            !in_array($request, [
+                static::REQUEST_PLUGIN_CONTENT,
+                static::REQUEST_PLUGIN_DETAIL,
+                static::REQUEST_THEME_DETAIL,
+                static::REQUEST_PROJECT_DETAIL
+            ])
+        ) {
+            throw new ApplicationException('Invalid request option.');
+        }
+
+        return $this->api->fetch(
+            $request,
+            [$request === static::REQUEST_PROJECT_DETAIL ? 'id' : 'name' => $identifier]
+        );
+    }
+
+    /**
      * Contacts the update server for a response.
      * @throws ApplicationException
      */
-    public function requestServerData(string $uri, array $postData = []): array
+    public function fetch(string $uri, array $postData = []): array
     {
         $result = Http::post($this->createServerUrl($uri), function ($http) use ($postData) {
             $this->applyHttpAttributes($http, $postData);
@@ -112,7 +146,7 @@ class MarketPlaceApi
      * @param $postData - Extra post data
      * @throws ApplicationException
      */
-    public function requestServerFile(string $uri, string $fileCode, string $expectedHash, array $postData = []): void
+    public function fetchFile(string $uri, string $fileCode, string $expectedHash, array $postData = []): void
     {
         $filePath = $this->getFilePath($fileCode);
 
@@ -141,7 +175,7 @@ class MarketPlaceApi
     {
         $serverUri = $productType === 'plugin' ? 'plugin/search' : 'theme/search';
 
-        return $this->requestServerData($serverUri, ['query' => $query]);
+        return $this->fetch($serverUri, ['query' => $query]);
     }
 
     public function requestProductDetails(array|string $codes, string $type = null): array
@@ -213,7 +247,7 @@ class MarketPlaceApi
             return Cache::get($cacheKey);
         }
 
-        $data = $this->requestServerData($type . $url);
+        $data = $this->fetch($type . $url);
 
         Cache::put($cacheKey, $data, now()->addMinutes(60));
 

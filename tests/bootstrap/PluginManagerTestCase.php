@@ -6,10 +6,9 @@ use Illuminate\Console\OutputStyle;
 use ReflectionClass;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
-use System\Classes\PluginManager;
+use System\Classes\Extensions\PluginManager;
 use System\Classes\UpdateManager;
 use System\Classes\VersionManager;
-
 use Winter\Storm\Database\Model as ActiveRecord;
 
 class PluginManagerTestCase extends TestCase

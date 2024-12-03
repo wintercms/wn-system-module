@@ -1,13 +1,15 @@
 <?php namespace System\Classes;
 
-use File;
-use Yaml;
-use Db;
 use Carbon\Carbon;
+use Db;
+use File;
 use Illuminate\Console\View\Components\Error;
 use Illuminate\Console\View\Components\Info;
 use Illuminate\Console\View\Components\Task;
+use System\Classes\Extensions\PluginBase;
+use System\Classes\Extensions\PluginManager;
 use Winter\Storm\Database\Updater;
+use Yaml;
 
 /**
  * Version manager

@@ -10,14 +10,15 @@ use Illuminate\Foundation\Vite as LaravelVite;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Request;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
 use System\Classes\CombineAssets;
 use System\Classes\ErrorHandler;
+use System\Classes\Extensions\PluginManager;
+use System\Classes\FileManifest;
 use System\Classes\MailManager;
 use System\Classes\MarkupManager;
-use System\Classes\PluginManager;
 use System\Classes\SettingsManager;
+use System\Classes\SourceManifest;
 use System\Classes\UpdateManager;
 use System\Helpers\DateTime;
 use System\Models\EventLog;
@@ -146,6 +147,10 @@ class ServiceProvider extends ModuleServiceProvider
 
         // Register the Laravel Vite singleton
         $this->app->singleton(LaravelVite::class, \System\Classes\Asset\Vite::class);
+
+        // @TODO: Document
+        $this->app->bind(SourceManifest::class, SourceManifest::class);
+        $this->app->bind(FileManifest::class, FileManifest::class);
     }
 
     /**
@@ -179,7 +184,7 @@ class ServiceProvider extends ModuleServiceProvider
                 // @see octobercms/october#3208
                 || (
                     $this->app->hasDatabase()
-                    && !Schema::hasTable(UpdateManager::instance()->getMigrationTableName())
+                    && !UpdateManager::instance()->isSystemSetup()
                 )
             )
         ) {

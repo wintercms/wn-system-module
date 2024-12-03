@@ -56,7 +56,7 @@ class WinterDown extends Command
 
         UpdateManager::instance()
             ->setNotesOutput($this->output)
-            ->uninstall();
+            ->tearDownTheSystem();
 
         return 0;
     }

@@ -111,4 +111,8 @@ return [
     'October\Rain\Scaffold\Console\CreateReportWidget'   => Backend\Console\CreateReportWidget::class,
     'October\Rain\Scaffold\Console\CreateTheme'          => Cms\Console\CreateTheme::class,
     'October\Rain\Scaffold\Console\CreateComponent'      => Cms\Console\CreateComponent::class,
+
+    // Extension Management
+    'System\Classes\PluginManager' => System\Classes\Extensions\PluginManager::class,
+    'System\Classes\PluginBase' => System\Classes\Extensions\PluginBase::class,
 ];

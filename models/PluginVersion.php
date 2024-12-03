@@ -3,7 +3,7 @@
 namespace System\Models;
 
 use Illuminate\Support\Facades\Lang;
-use System\Classes\PluginManager;
+use System\Classes\Extensions\PluginManager;
 use Winter\Storm\Database\Model;
 
 /**

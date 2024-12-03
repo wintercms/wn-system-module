@@ -5,30 +5,20 @@ namespace System\Controllers;
 use Backend\Classes\Controller;
 use Backend\Facades\Backend;
 use Backend\Facades\BackendMenu;
-use Backend\Widgets\Form;
-use Cms\Classes\ThemeManager;
 use Exception;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Response;
-use Illuminate\Support\Facades\Storage;
 use System\Classes\Core\MarketPlaceApi;
-use System\Classes\PluginManager;
+use System\Classes\Extensions\PluginManager;
 use System\Classes\SettingsManager;
 use System\Classes\UpdateManager;
 use System\Models\Parameter;
 use System\Models\PluginVersion;
-use Winter\Storm\Database\Model;
-use Winter\Storm\Database\Models\DeferredBinding;
 use Winter\Storm\Exception\ApplicationException;
-use Winter\Storm\Support\Facades\File as FileHelper;
-use Winter\Storm\Support\Facades\File;
 use Winter\Storm\Support\Facades\Flash;
-use Winter\Storm\Support\Facades\Html;
-use Winter\Storm\Support\Facades\Markdown;
-use Winter\Storm\Support\Str;
 
 /**
  * Updates controller
@@ -38,6 +28,10 @@ use Winter\Storm\Support\Str;
  */
 class Updates extends Controller
 {
+    use Updates\Traits\ManagesMarketplaceProject;
+    use Updates\Traits\ManagesPlugins;
+    use Updates\Traits\ManagesThemes;
+
     /**
      * @var array Extensions implemented by this controller.
      */
@@ -58,9 +52,6 @@ class Updates extends Controller
      */
     public $requiredPermissions = ['system.manage_updates'];
 
-    /**
-     * Constructor.
-     */
     public function __construct()
     {
         parent::__construct();
@@ -71,15 +62,12 @@ class Updates extends Controller
         BackendMenu::setContext('Winter.System', 'system', 'updates');
         SettingsManager::setContext('Winter.System', 'updates');
 
-        if ($this->getAjaxHandler() == 'onExecuteStep') {
-            $this->useSecurityToken = false;
-        }
 
-        $this->vars['warnings'] = $this->getWarnings();
+        $this->vars['warnings'] = PluginManager::instance()->getWarnings();
     }
 
     /**
-     * Index controller
+     * Main landing page for managing installed plugins, installing new plugins and themes
      */
     public function index(): void
     {
@@ -93,15 +81,6 @@ class Updates extends Controller
         $this->asExtension('ListController')->index();
     }
 
-    /**
-     * Plugin manage controller
-     */
-    public function manage(): void
-    {
-        $this->pageTitle = 'system::lang.plugins.manage';
-        PluginManager::instance()->clearFlagCache();
-        $this->asExtension('ListController')->index();
-    }
 
     /**
      * Install new plugins / themes
@@ -123,125 +102,11 @@ class Updates extends Controller
             $this->vars['installedPlugins'] = $this->getInstalledPlugins();
             $this->vars['installedThemes'] = $this->getInstalledThemes();
             $this->vars['packageUploadWidget'] = $this->getPackageUploadWidget($tab === 'themes' ? 'theme' : 'plugin');
-        }
-        catch (Exception $ex) {
+        } catch (Exception $ex) {
             $this->handleError($ex);
         }
 
         return null;
-    }
-
-    public function details($urlCode = null, $tab = null): void
-    {
-        try {
-            $this->pageTitle = 'system::lang.updates.details_title';
-            $this->addJs('/modules/system/assets/js/updates/details.js', 'core');
-            $this->addCss('/modules/system/assets/css/updates/details.css', 'core');
-
-            $readmeFiles = ['README.md', 'readme.md'];
-            $upgradeFiles = ['UPGRADE.md', 'upgrade.md'];
-            $licenceFiles = ['LICENCE.md', 'licence.md', 'LICENSE.md', 'license.md'];
-
-            $readme = $changelog = $upgrades = $licence = $name = null;
-            $code = str_replace('-', '.', $urlCode);
-
-            /*
-             * Lookup the plugin
-             */
-            $manager = PluginManager::instance();
-            $plugin = $manager->findByIdentifier($code);
-            $code = $manager->getIdentifier($plugin);
-            $path = $manager->getPluginPath($plugin);
-
-            if ($path && $plugin) {
-                $details = $plugin->pluginDetails();
-                $readme = $this->getPluginMarkdownFile($path, $readmeFiles);
-                $changelog = $plugin->getPluginVersions(false);
-                $upgrades = $this->getPluginMarkdownFile($path, $upgradeFiles);
-                $licence = $this->getPluginMarkdownFile($path, $licenceFiles);
-
-                $pluginVersion = PluginVersion::whereCode($code)->first();
-                $this->vars['pluginName'] = array_get($details, 'name', 'system::lang.plugin.unnamed');
-                $this->vars['pluginVersion'] = $pluginVersion ? $pluginVersion->version : '???';
-                $this->vars['pluginAuthor'] = array_get($details, 'author');
-                $this->vars['pluginIcon'] = array_get($details, 'icon', 'icon-leaf');
-                $this->vars['pluginHomepage'] = array_get($details, 'homepage');
-            }
-            else {
-                throw new ApplicationException(Lang::get('system::lang.updates.plugin_not_found'));
-            }
-
-            /*
-             * Fetch from server
-             */
-            if (get('fetch')) {
-                $fetchedContent = UpdateManager::instance()->requestPluginContent($code);
-                $upgrades = array_get($fetchedContent, 'upgrade_guide_html');
-            }
-
-            $this->vars['activeTab'] = $tab ?: 'readme';
-            $this->vars['urlCode'] = $urlCode;
-            $this->vars['readme'] = $readme;
-            $this->vars['changelog'] = $changelog;
-            $this->vars['upgrades'] = $upgrades;
-            $this->vars['licence'] = $licence;
-        }
-        catch (Exception $ex) {
-            $this->handleError($ex);
-        }
-    }
-
-    protected function getPluginMarkdownFile(string $path, array $filenames): ?string
-    {
-        $contents = null;
-        foreach ($filenames as $file) {
-            if (!File::exists($path . '/' . $file)) {
-                continue;
-            }
-
-            $contents = File::get($path . '/' . $file);
-
-            /*
-             * Parse markdown, clean HTML, remove first H1 tag
-             */
-            $contents = Markdown::parse($contents);
-            $contents = Html::clean($contents);
-            $contents = preg_replace('@<h1[^>]*?>.*?<\/h1>@si', '', $contents, 1);
-        }
-
-        return $contents;
-    }
-
-    protected function getWarnings(): array
-    {
-        $warnings = [];
-        $missingDependencies = PluginManager::instance()->findMissingDependencies();
-
-        if (!empty($missingDependencies)) {
-            PluginManager::instance()->clearFlagCache();
-        }
-
-        foreach ($missingDependencies as $pluginCode => $plugin) {
-            foreach ($plugin as $missingPluginCode) {
-                $warnings[] = Lang::get('system::lang.updates.update_warnings_plugin_missing', [
-                    'code' => '<strong>' . $missingPluginCode . '</strong>',
-                    'parent_code' => '<strong>' . $pluginCode . '</strong>'
-                ]);
-            }
-        }
-
-        $replacementMap = PluginManager::instance()->getReplacementMap();
-
-        foreach ($replacementMap as $alias => $plugin) {
-            if (PluginManager::instance()->getActiveReplacementMap($alias)) {
-                $warnings[] = Lang::get('system::lang.updates.update_warnings_plugin_replace', [
-                    'plugin' => '<strong>' . $plugin . '</strong>',
-                    'alias' => '<strong>' . $alias . '</strong>'
-                ]);
-            }
-        }
-
-        return $warnings;
     }
 
     /**
@@ -381,9 +246,7 @@ class Updates extends Controller
     {
         $hasImportantUpdates = false;
 
-        /*
-         * Core
-         */
+        // Core
         if (isset($result['core'])) {
             $coreImportant = false;
 
@@ -401,9 +264,7 @@ class Updates extends Controller
             $result['core']['isImportant'] = $coreImportant ? '1' : '0';
         }
 
-        /*
-         * Plugins
-         */
+        // Plugins
         foreach (array_get($result, 'plugins', []) as $code => $plugin) {
             $isImportant = false;
 
@@ -483,8 +344,7 @@ class Updates extends Controller
             ];
 
             $this->vars['updateSteps'] = $updateSteps;
-        }
-        catch (Exception $ex) {
+        } catch (Exception $ex) {
             $this->handleError($ex);
         }
 
@@ -515,8 +375,7 @@ class Updates extends Controller
                 }
 
                 $plugins = array_combine($pluginCodes, $plugins);
-            }
-            else {
+            } else {
                 $plugins = [];
             }
 
@@ -531,8 +390,7 @@ class Updates extends Controller
                 }
 
                 $themes = array_combine($themeCodes, $themes);
-            }
-            else {
+            } else {
                 $themes = [];
             }
 
@@ -578,8 +436,7 @@ class Updates extends Controller
             ];
 
             $this->vars['updateSteps'] = $updateSteps;
-        }
-        catch (Exception $ex) {
+        } catch (Exception $ex) {
             $this->handleError($ex);
         }
 
@@ -672,57 +529,6 @@ class Updates extends Controller
     }
 
     //
-    // Bind to Project
-    //
-
-    /**
-     * Displays the form for entering a Project ID
-     */
-    public function onLoadProjectForm(): string
-    {
-        return $this->makePartial('project_form');
-    }
-
-    /**
-     * Validate the project ID and execute the project installation
-     */
-    public function onAttachProject(): string
-    {
-        try {
-            if (!$projectId = trim(post('project_id'))) {
-                throw new ApplicationException(Lang::get('system::lang.project.id.missing'));
-            }
-
-            $manager = UpdateManager::instance();
-            $result = $manager->requestProjectDetails($projectId);
-
-            Parameter::set([
-                'system::project.id'    => $projectId,
-                'system::project.name'  => $result['name'],
-                'system::project.owner' => $result['owner'],
-            ]);
-
-            return $this->onForceUpdate(false);
-        }
-        catch (Exception $ex) {
-            $this->handleError($ex);
-            return $this->makePartial('project_form');
-        }
-    }
-
-    public function onDetachProject(): RedirectResponse
-    {
-        Parameter::set([
-            'system::project.id'    => null,
-            'system::project.name'  => null,
-            'system::project.owner' => null,
-        ]);
-
-        Flash::success(Lang::get('system::lang.project.unbind_success'));
-        return Backend::redirect('system/updates');
-    }
-
-    //
     // View Changelog
     //
 
@@ -752,303 +558,6 @@ class Updates extends Controller
     }
 
     //
-    // Plugin management
-    //
-
-    protected ?Form $packageUploadWidget = null;
-
-    /**
-     * Get the form widget for the import popup.
-     */
-    protected function getPackageUploadWidget(string $type = 'plugin'): Form
-    {
-        $type = post('type', $type);
-
-        if (!in_array($type, ['plugin', 'theme'])) {
-            throw new ApplicationException('Invalid package type');
-        }
-
-        if ($this->packageUploadWidget !== null) {
-            return $this->packageUploadWidget;
-        }
-
-        $config = $this->makeConfig("form.{$type}_upload.yaml");
-        $config->model = new class extends Model {
-            public $attachOne = [
-                'uploaded_package' => [\System\Models\File::class, 'public' => false],
-            ];
-        };
-        $widget = $this->makeWidget(Form::class, $config);
-        $widget->bindToController();
-
-        return $this->packageUploadWidget = $widget;
-    }
-
-    /**
-     * Displays the plugin uploader form
-     */
-    public function onLoadPluginUploader(): string
-    {
-        $this->vars['packageUploadWidget'] = $this->getPackageUploadWidget('plugin');
-        return $this->makePartial('popup_upload_plugin');
-    }
-
-    /**
-     * Installs an uploaded plugin
-     */
-    public function onInstallUploadedPlugin(): string
-    {
-        try {
-            // Get the deferred binding record for the uploaded file
-            $widget = $this->getPackageUploadWidget();
-            $class = str_contains($class = Str::before(get_class($widget->model), chr(0)), '\\\\')
-                ? str_replace('\\\\', '\\', $class)
-                : $class;
-
-            $deferred = DeferredBinding::query()
-                ->where('master_type', 'LIKE', $class . '%')
-                ->where('master_field', 'uploaded_package')
-                ->where('session_key', $widget->getSessionKey())
-                ->first();
-
-            // Attempt to get the file from the deferred binding
-            if (!$deferred || !$deferred->slave) {
-                throw new ApplicationException(Lang::get('system::lang.server.response_invalid'));
-            }
-
-            $file = $deferred->slave;
-            $localPath = $file->disk_name;
-            if (!FileHelper::copyBetweenDisks($file->getDisk(), 'temp', $file->getDiskPath(), $localPath)) {
-                throw new ApplicationException(Lang::get('system::lang.server.shit_gone_fucky'));
-            }
-
-            /**
-             * @TODO:
-             * - Process the uploaded file to identify the plugins to install
-             * - (optional) require confirmation to install each detected plugin
-             * - Install the identified plugins
-             * - Ensure that deferred binding records and uploaded files are removed post processing or on failure
-             */
-
-            $manager = UpdateManager::instance();
-
-            $result = $manager->installUploadedPlugin(Storage::disk('temp')->path($localPath));
-
-            if (!isset($result['code']) || !isset($result['hash'])) {
-                throw new ApplicationException(Lang::get('system::lang.server.response_invalid'));
-            }
-
-            $name = $result['code'];
-            $hash = $result['hash'];
-            $plugins = [$name => $hash];
-            $plugins = $this->appendRequiredPlugins($plugins, $result);
-
-            /*
-             * Update steps
-             */
-            $updateSteps = $this->buildUpdateSteps(null, $plugins, [], true);
-
-            /*
-             * Finish up
-             */
-            $updateSteps[] = [
-                'code'  => 'completeInstall',
-                'label' => Lang::get('system::lang.install.install_completing'),
-            ];
-
-            $this->vars['updateSteps'] = $updateSteps;
-
-            return $this->makePartial('execute');
-        }
-        catch (Exception $ex) {
-            // @TODO: Remove this, temporary debugging
-            throw $ex;
-            $this->handleError($ex);
-            return $this->makePartial('plugin_uploader');
-        }
-    }
-
-    /**
-     * Validate the plugin code and execute the plugin installation
-     *
-     * @throws ApplicationException If validation fails or the plugin cannot be installed
-     */
-    public function onInstallPlugin(): string
-    {
-        try {
-            if (!$code = trim(post('code'))) {
-                throw new ApplicationException(Lang::get('system::lang.install.missing_plugin_name'));
-            }
-
-            $manager = UpdateManager::instance();
-            $result = $manager->requestPluginDetails($code);
-
-            if (!isset($result['code']) || !isset($result['hash'])) {
-                throw new ApplicationException(Lang::get('system::lang.server.response_invalid'));
-            }
-
-            $name = $result['code'];
-            $hash = $result['hash'];
-            $plugins = [$name => $hash];
-            $plugins = $this->appendRequiredPlugins($plugins, $result);
-
-            /*
-             * Update steps
-             */
-            $updateSteps = $this->buildUpdateSteps(null, $plugins, [], true);
-
-            /*
-             * Finish up
-             */
-            $updateSteps[] = [
-                'code'  => 'completeInstall',
-                'label' => Lang::get('system::lang.install.install_completing'),
-            ];
-
-            $this->vars['updateSteps'] = $updateSteps;
-
-            return $this->makePartial('execute');
-        }
-        catch (Exception $ex) {
-            $this->handleError($ex);
-            return $this->makePartial('plugin_form');
-        }
-    }
-
-    /**
-     * Rollback and remove a single plugin from the system.
-     */
-    public function onRemovePlugin(): RedirectResponse
-    {
-        if ($pluginCode = post('code')) {
-            PluginManager::instance()->deletePlugin($pluginCode);
-            Flash::success(Lang::get('system::lang.plugins.remove_success'));
-        }
-
-        return Redirect::refresh();
-    }
-
-    /**
-     * Perform a bulk action on the provided plugins
-     */
-    public function onBulkAction(): RedirectResponse
-    {
-        if (($bulkAction = post('action')) &&
-            ($checkedIds = post('checked')) &&
-            is_array($checkedIds) &&
-            count($checkedIds)
-        ) {
-            $manager = PluginManager::instance();
-            $codes = PluginVersion::lists('code', 'id');
-
-            foreach ($checkedIds as $id) {
-                $code = $codes[$id] ?? null;
-                if (!$code) {
-                    continue;
-                }
-
-                switch ($bulkAction) {
-                    // Enables plugin's updates.
-                    case 'freeze':
-                        $manager->freezePlugin($code);
-                        break;
-
-                    // Disables plugin's updates.
-                    case 'unfreeze':
-                        $manager->unfreezePlugin($code);
-                        break;
-
-                    // Disables plugin on the system.
-                    case 'disable':
-                        $manager->disablePlugin($code);
-                        break;
-
-                    // Enables plugin on the system.
-                    case 'enable':
-                        $manager->enablePlugin($code);
-                        break;
-
-                    // Rebuilds plugin database migrations.
-                    case 'refresh':
-                        $manager->refreshPlugin($code);
-                        break;
-
-                    // Rollback and remove plugins from the system.
-                    case 'remove':
-                        $manager->deletePlugin($code);
-                        break;
-                }
-            }
-        }
-
-        Flash::success(Lang::get("system::lang.plugins.{$bulkAction}_success"));
-        return redirect()->refresh();
-    }
-
-    //
-    // Theme management
-    //
-
-    /**
-     * Validate the theme code and execute the theme installation
-     */
-    public function onInstallTheme()
-    {
-        try {
-            if (!$code = trim(post('code'))) {
-                throw new ApplicationException(Lang::get('system::lang.install.missing_theme_name'));
-            }
-
-            $manager = UpdateManager::instance();
-            $result = $manager->requestThemeDetails($code);
-
-            if (!isset($result['code']) || !isset($result['hash'])) {
-                throw new ApplicationException(Lang::get('system::lang.server.response_invalid'));
-            }
-
-            $name = $result['code'];
-            $hash = $result['hash'];
-            $themes = [$name => $hash];
-            $plugins = $this->appendRequiredPlugins([], $result);
-
-            /*
-             * Update steps
-             */
-            $updateSteps = $this->buildUpdateSteps(null, $plugins, $themes, true);
-
-            /*
-             * Finish up
-             */
-            $updateSteps[] = [
-                'code'  => 'completeInstall',
-                'label' => Lang::get('system::lang.install.install_completing'),
-            ];
-
-            $this->vars['updateSteps'] = $updateSteps;
-
-            return $this->makePartial('execute');
-        }
-        catch (Exception $ex) {
-            $this->handleError($ex);
-            return $this->makePartial('theme_form');
-        }
-    }
-
-    /**
-     * Deletes a single theme from the system.
-     */
-    public function onRemoveTheme(): RedirectResponse
-    {
-        if ($themeCode = post('code')) {
-            ThemeManager::instance()->deleteTheme($themeCode);
-
-            Flash::success(trans('cms::lang.theme.delete_theme_success'));
-        }
-
-        return Redirect::refresh();
-    }
-
-    //
     // Product install
     //
 
@@ -1061,48 +570,6 @@ class Updates extends Controller
         $searchType = get('search', 'plugins') === 'plugins' ? 'plugin' : 'theme';
 
         return MarketPlaceApi::instance()->search(get('query'), $searchType);
-    }
-
-    public function onGetPopularPlugins(): array
-    {
-        return [
-            'result' => $this->filterPopularProducts(
-                MarketPlaceApi::instance()->requestPopularProducts('plugin'),
-                $this->getInstalledPlugins()
-            )
-        ];
-    }
-
-    public function onGetPopularThemes(): array
-    {
-        return [
-            'result' => $this->filterPopularProducts(
-                MarketPlaceApi::instance()->requestPopularProducts('theme'),
-                $this->getInstalledThemes()
-            )
-        ];
-    }
-
-    protected function getInstalledPlugins(): array
-    {
-        $installed = PluginVersion::lists('code');
-        return MarketPlaceApi::instance()->requestProductDetails($installed, 'plugin');
-    }
-
-    protected function getInstalledThemes(): array
-    {
-        $history = Parameter::get('system::theme.history', []);
-        $installed = MarketPlaceApi::instance()->requestProductDetails(array_keys($history), 'theme');
-
-        /*
-         * Splice in the directory names
-         */
-        foreach ($installed as $key => $data) {
-            $code = array_get($data, 'code');
-            $installed[$key]['dirName'] = array_get($history, $code, $code);
-        }
-
-        return $installed;
     }
 
     /*
@@ -1143,23 +610,5 @@ class Updates extends Controller
     protected function decodeCode(string $code): string
     {
         return str_replace(':', '.', $code);
-    }
-
-    /**
-     * Adds require plugin codes to the collection based on a result.
-     */
-    protected function appendRequiredPlugins(array $plugins, array $result): array
-    {
-        foreach ((array) array_get($result, 'require') as $plugin) {
-            if (
-                ($name = array_get($plugin, 'code')) &&
-                ($hash = array_get($plugin, 'hash')) &&
-                !PluginManager::instance()->hasPlugin($name)
-            ) {
-                $plugins[$name] = $hash;
-            }
-        }
-
-        return $plugins;
     }
 }

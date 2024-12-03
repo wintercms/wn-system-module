@@ -1,8 +1,7 @@
 <?php namespace System\Console;
 
+use System\Classes\Extensions\PluginManager;
 use Winter\Storm\Console\Command;
-use System\Classes\PluginManager;
-use System\Models\PluginVersion;
 
 /**
  * Console command to disable a plugin.
