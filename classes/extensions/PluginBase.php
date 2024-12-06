@@ -535,43 +535,43 @@ abstract class PluginBase extends ServiceProviderBase implements WinterExtension
         return true;
     }
 
-    public function install(): static
+    public function extensionInstall(): static
     {
         // TODO: Implement install() method.
         return $this;
     }
 
-    public function uninstall(): static
+    public function extensionUninstall(): static
     {
         // TODO: Implement uninstall() method.
         return $this;
     }
 
-    public function enable(): static
+    public function extensionEnable(): static
     {
         // TODO: Implement enable() method.
         return $this;
     }
 
-    public function disable(): static
+    public function extensionDisable(): static
     {
         // TODO: Implement disable() method.
         return $this;
     }
 
-    public function rollback(): static
+    public function extensionRollback(): static
     {
         // TODO: Implement rollback() method.
         return $this;
     }
 
-    public function refresh(): static
+    public function extensionRefresh(): static
     {
         // TODO: Implement refresh() method.
         return $this;
     }
 
-    public function update(): static
+    public function extensionUpdate(): static
     {
         // TODO: Implement update() method.
         return $this;

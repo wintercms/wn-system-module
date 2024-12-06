@@ -6,13 +6,17 @@ use Winter\Storm\Exception\ApplicationException;
 
 interface ExtensionManager
 {
+    public const EXTENSION_NAME = '';
+
     public function list(): array;
 
     public function create(): WinterExtension;
     /**
      * @throws ApplicationException If the installation fails
      */
-    public function install(WinterExtension|string $extension): WinterExtension;
+    public function install(ExtensionSource|WinterExtension|string $extension): WinterExtension;
+    public function isInstalled(ExtensionSource|WinterExtension|string $extension): bool;
+    public function getExtension(ExtensionSource|WinterExtension|string $extension): ?WinterExtension;
     public function enable(WinterExtension|string $extension): mixed;
     public function disable(WinterExtension|string $extension): mixed;
     public function update(WinterExtension|string $extension): mixed;

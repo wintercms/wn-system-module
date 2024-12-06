@@ -16,7 +16,9 @@ use RecursiveIteratorIterator;
 use System\Classes\ComposerManager;
 use System\Classes\SettingsManager;
 use System\Classes\UpdateManager;
+use System\Classes\VersionManager;
 use System\Models\PluginVersion;
+use Winter\Storm\Exception\ApplicationException;
 use Winter\Storm\Exception\SystemException;
 use Winter\Storm\Foundation\Application;
 use Winter\Storm\Support\ClassLoader;
@@ -33,6 +35,8 @@ use Winter\Storm\Support\Str;
 class PluginManager implements ExtensionManager
 {
     use \Winter\Storm\Support\Traits\Singleton;
+
+    public const EXTENSION_NAME = 'plugin';
 
     //
     // Disabled by system
@@ -1121,9 +1125,42 @@ class PluginManager implements ExtensionManager
         // TODO: Implement create() method.
     }
 
-    public function install(WinterExtension|string $extension): WinterExtension
+    public function install(ExtensionSource|WinterExtension|string $extension): WinterExtension
     {
-        // TODO: Implement install() method.
+        // Insure the in memory plugins match those on disk
+        $this->loadPlugins();
+
+        // Get the plugin code from input and then update the plugin
+        if (!($code = $this->resolveExtensionCode($extension)) || !VersionManager::instance()->updatePlugin($code)) {
+            throw new ApplicationException('Unable to update plugin: ' . $code);
+        }
+
+        // Force a refresh of the plugin
+        $this->refreshPlugin($code);
+
+        // Return an instance of the plugin
+        return $this->findByIdentifier($code);
+    }
+
+    public function isInstalled(ExtensionSource|WinterExtension|string $extension): bool
+    {
+        if (
+            !($code = $this->resolveExtensionCode($extension))
+            || VersionManager::instance()->getCurrentVersion($code) === '0'
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function getExtension(WinterExtension|ExtensionSource|string $extension): ?WinterExtension
+    {
+        if (!($code = $this->resolveExtensionCode($extension))) {
+            return null;
+        }
+
+        return $this->findByIdentifier($code);
     }
 
     public function enable(WinterExtension|string $extension): mixed
@@ -1154,5 +1191,20 @@ class PluginManager implements ExtensionManager
     public function uninstall(WinterExtension|string $extension): mixed
     {
         // TODO: Implement uninstall() method.
+    }
+
+    protected function resolveExtensionCode(ExtensionSource|WinterExtension|string $extension): ?string
+    {
+        if (is_string($extension)) {
+            return $this->getNormalizedIdentifier($extension);
+        }
+        if ($extension instanceof ExtensionSource) {
+            return $this->getNormalizedIdentifier($extension->getCode());
+        }
+        if ($extension instanceof WinterExtension) {
+            return $extension->getPluginIdentifier();
+        }
+
+        return null;
     }
 }

@@ -97,37 +97,37 @@ abstract class ModuleServiceProvider extends ServiceProviderBase implements Wint
         $config->package($namespace, $path);
     }
 
-    public function install(): static
+    public function extensionInstall(): static
     {
         // TODO: Implement install() method.
     }
 
-    public function uninstall(): static
+    public function extensionUninstall(): static
     {
         // TODO: Implement uninstall() method.
     }
 
-    public function enable(): static
+    public function extensionEnable(): static
     {
         // TODO: Implement enable() method.
     }
 
-    public function disable(): static
+    public function extensionDisable(): static
     {
         // TODO: Implement disable() method.
     }
 
-    public function rollback(): static
+    public function extensionRollback(): static
     {
         // TODO: Implement rollback() method.
     }
 
-    public function refresh(): static
+    public function extensionRefresh(): static
     {
         // TODO: Implement refresh() method.
     }
 
-    public function update(): static
+    public function extensionUpdate(): static
     {
         // TODO: Implement update() method.
     }
