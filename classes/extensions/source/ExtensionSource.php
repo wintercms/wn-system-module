@@ -1,10 +1,12 @@
 <?php
 
-namespace System\Classes\Extensions;
+namespace System\Classes\Extensions\Source;
 
 use Cms\Classes\ThemeManager;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\File;
+use System\Classes\Extensions\ExtensionManager;
+use System\Classes\Extensions\WinterExtension;
 use System\Classes\Packager\Composer;
 use Winter\Packager\Exceptions\CommandException;
 use Winter\Storm\Exception\ApplicationException;

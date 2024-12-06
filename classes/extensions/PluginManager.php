@@ -14,6 +14,7 @@ use InvalidArgumentException;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use System\Classes\ComposerManager;
+use System\Classes\Extensions\Source\ExtensionSource;
 use System\Classes\SettingsManager;
 use System\Classes\UpdateManager;
 use System\Classes\VersionManager;

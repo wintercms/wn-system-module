@@ -2,6 +2,7 @@
 
 namespace System\Classes\Extensions;
 
+use System\Classes\Extensions\Source\ExtensionSource;
 use Winter\Storm\Exception\ApplicationException;
 
 interface ExtensionManager
