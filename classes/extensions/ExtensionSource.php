@@ -117,7 +117,7 @@ class ExtensionSource
     public function install(): WinterExtension
     {
         if ($this->status === static::STATUS_UNINSTALLED) {
-            throw new ApplicationException('Extension source is not unpacked');
+            $this->createFiles();
         }
 
         if ($this->status === static::STATUS_INSTALLED) {
