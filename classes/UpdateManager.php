@@ -10,6 +10,7 @@ use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Support\Facades\App;
 use System\Classes\Core\MarketPlaceApi;
 use System\Classes\Extensions\PluginManager;
+use System\Classes\Extensions\Plugins\VersionManager;
 use System\Helpers\Cache as CacheHelper;
 use System\Models\Parameter;
 use Winter\Storm\Exception\ApplicationException;
@@ -35,7 +36,6 @@ class UpdateManager
 
     protected PluginManager $pluginManager;
     protected ThemeManager $themeManager;
-    protected VersionManager $versionManager;
     protected MarketPlaceApi $api;
     protected Migrator $migrator;
     protected DatabaseMigrationRepository $repository;
@@ -80,10 +80,6 @@ class UpdateManager
         $this->themeManager = isset($this->themeManager) && !$refresh
             ? $this->themeManager
             : (class_exists(ThemeManager::class) ? ThemeManager::instance() : null);
-
-        $this->versionManager = isset($this->versionManager) && !$refresh
-            ? $this->versionManager
-            : VersionManager::instance();
 
         $this->migrator = App::make('migrator');
         $this->repository = App::make('migration.repository');

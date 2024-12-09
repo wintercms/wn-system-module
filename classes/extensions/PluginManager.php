@@ -5,6 +5,7 @@ namespace System\Classes\Extensions;
 use Backend\Classes\NavigationManager;
 use FilesystemIterator;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
@@ -14,10 +15,11 @@ use InvalidArgumentException;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use System\Classes\ComposerManager;
+use System\Classes\Extensions\Plugins\PluginManagerDeprecatedMethodsTrait;
+use System\Classes\Extensions\Plugins\VersionManager;
 use System\Classes\Extensions\Source\ExtensionSource;
 use System\Classes\SettingsManager;
 use System\Classes\UpdateManager;
-use System\Classes\VersionManager;
 use System\Models\PluginVersion;
 use Winter\Storm\Exception\ApplicationException;
 use Winter\Storm\Exception\SystemException;
@@ -33,28 +35,11 @@ use Winter\Storm\Support\Str;
  * @package winter\wn-system-module
  * @author Alexey Bobkov, Samuel Georges
  */
-class PluginManager implements ExtensionManager
+class PluginManager extends ExtensionManager implements ExtensionManagerInterface
 {
-    use \Winter\Storm\Support\Traits\Singleton;
+    use PluginManagerDeprecatedMethodsTrait;
 
     public const EXTENSION_NAME = 'plugin';
-
-    //
-    // Disabled by system
-    //
-
-    public const DISABLED_MISSING = 'disabled-missing';
-    public const DISABLED_REPLACED = 'disabled-replaced';
-    public const DISABLED_REPLACEMENT_FAILED = 'disabled-replacement-failed';
-    public const DISABLED_MISSING_DEPENDENCIES = 'disabled-dependencies';
-
-    //
-    // Explicitly disabled for a reason
-    //
-
-    public const DISABLED_REQUEST = 'disabled-request';
-    public const DISABLED_BY_USER = 'disabled-user';
-    public const DISABLED_BY_CONFIG = 'disabled-config';
 
     /**
      * The application instance, since Plugins are an extension of a Service Provider
@@ -62,54 +47,59 @@ class PluginManager implements ExtensionManager
     protected Application $app;
 
     /**
+     * @var VersionManager Handles versioning of plugins in the database.
+     */
+    protected VersionManager $versionManager;
+
+    /**
      * @var PluginBase[] Container array used for storing plugin information objects.
      */
-    protected $plugins = [];
+    protected array $plugins = [];
 
     /**
      * @var array Array of plugin codes that contain any flags currently associated with the plugin
      */
-    protected $pluginFlags = [];
+    protected array $pluginFlags = [];
 
     /**
      * @var PluginVersion[] Local cache of loaded PluginVersion records keyed by plugin code
      */
-    protected $pluginRecords = [];
+    protected array $pluginRecords = [];
 
     /**
      * @var array A map of normalized plugin identifiers [lowercase.identifier => Normalized.Identifier]
      */
-    protected $normalizedMap = [];
+    protected array $normalizedMap = [];
 
     /**
      * @var array A map of plugin identifiers with their replacements [Original.Plugin => Replacement.Plugin]
      */
-    protected $replacementMap = [];
+    protected array $replacementMap = [];
 
     /**
      * @var array A map of plugins that are currently replaced [Original.Plugin => Replacement.Plugin]
      */
-    protected $activeReplacementMap = [];
+    protected array $activeReplacementMap = [];
 
     /**
      * @var bool Flag to indicate that all plugins have had the register() method called by registerAll() being called on this class.
      */
-    protected $registered = false;
+    protected bool $registered = false;
 
     /**
      * @var bool Flag to indicate that all plugins have had the boot() method called by bootAll() being called on this class.
      */
-    protected $booted = false;
+    protected bool $booted = false;
 
     /**
      * @var array Cache of registration method results.
      */
-    protected $registrationMethodCache = [];
+    protected array $registrationMethodCache = [];
 
     /**
      * @var bool Prevent all plugins from registering or booting
      */
-    public static $noInit = false;
+    public static bool $noInit = false;
 
     /**
      * Initializes the plugin manager
@@ -117,6 +107,9 @@ class PluginManager implements ExtensionManager
     protected function init(): void
     {
         $this->app = App::make('app');
+
+        // Define the version manager
+        $this->versionManager = new VersionManager($this);
 
         // Load the plugins from the filesystem and sort them by dependencies
         $this->loadPlugins();
@@ -130,7 +123,219 @@ class PluginManager implements ExtensionManager
     }
 
     /**
+     * Returns an array with all enabled plugins
+     *
+     * @return array [$code => $pluginObj]
+     */
+    public function list(): array
+    {
+        $activePlugins = array_diff_key($this->plugins, $this->pluginFlags);
+        return array_combine(
+            array_map(
+                fn($code) => $this->normalizedMap[$code],
+                array_keys($activePlugins)
+            ),
+            $activePlugins
+        );
+    }
+
+    public function create(string $extension): WinterExtension
+    {
+        Artisan::call('create:plugin', [
+            'plugin' => $extension
+        ]);
+
+        // Insure the in memory plugins match those on disk
+        $this->loadPlugins();
+
+        // Force a refresh of the plugin
+        $this->refresh($extension);
+
+        // Return an instance of the plugin
+        return $this->findByIdentifier($extension);
+    }
+
+    public function install(ExtensionSource|WinterExtension|string $extension): WinterExtension
+    {
+        // Insure the in memory plugins match those on disk
+        $this->loadPlugins();
+
+        // Get the plugin code from input and then update the plugin
+        if (!($code = $this->resolveExtensionCode($extension)) || !$this->versionManager->updatePlugin($code)) {
+            throw new ApplicationException('Unable to update plugin: ' . $code);
+        }
+
+        // Force a refresh of the plugin
+        $this->refresh($code);
+
+        // Return an instance of the plugin
+        return $this->findByIdentifier($code);
+    }
+
+    public function isInstalled(ExtensionSource|WinterExtension|string $extension): bool
+    {
+        if (
+            !($code = $this->resolveExtensionCode($extension))
+            || $this->versionManager->getCurrentVersion($code) === '0'
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function get(WinterExtension|ExtensionSource|string $extension): ?WinterExtension
+    {
+        if (!($code = $this->resolveExtensionCode($extension))) {
+            return null;
+        }
+
+        return $this->findByIdentifier($code);
+    }
+
+    /**
+     * Enables the provided plugin using the provided flag (defaults to static::DISABLED_BY_USER)
+     */
+    public function enable(WinterExtension|string $extension, string|bool $flag = self::DISABLED_BY_USER): ?bool
+    {
+        if (!($plugin = $this->get($extension))) {
+            return null;
+        }
+
+        // $flag used to be (bool) $byUser
+        if ($flag === true) {
+            $flag = static::DISABLED_BY_USER;
+        }
+
+        // Unflag the plugin as disabled
+        $this->unflagPlugin($plugin, $flag);
+
+        // Updates the database record for the plugin if required
+        if ($flag === static::DISABLED_BY_USER) {
+            $record = $this->getPluginRecord($plugin);
+            $record->is_disabled = false;
+            $record->save();
+
+            // Clear the cache so that the next request will regenerate the active flags
+            $this->clearFlagCache();
+        }
+
+        // Clear the registration values cache
+        $this->registrationMethodCache = [];
+
+        return true;
+    }
+
+    /**
+     * Disables the provided plugin using the provided flag (defaults to static::DISABLED_BY_USER)
+     */
+    public function disable(WinterExtension|string $extension, string|bool $flag = self::DISABLED_BY_USER): ?bool
+    {
+        if (!($plugin = $this->get($extension))) {
+            return null;
+        }
+
+        // $flag used to be (bool) $byUser
+        if ($flag === true) {
+            $flag = static::DISABLED_BY_USER;
+        }
+
+        // Flag the plugin as disabled
+        $this->flagPlugin($plugin, $flag);
+
+        // Updates the database record for the plugin if required
+        if ($flag === static::DISABLED_BY_USER) {
+            $record = $this->getPluginRecord($plugin);
+            $record->is_disabled = true;
+            $record->save();
+
+            // Clear the cache so that the next request will regenerate the active flags
+            $this->clearFlagCache();
+        }
+
+        // Clear the registration values cache
+        $this->registrationMethodCache = [];
+
+        return true;
+    }
+
+    public function update(WinterExtension|string $extension): ?bool
+    {
+        if (!($code = $this->resolveExtensionCode($extension))) {
+            return null;
+        }
+
+        $manager = UpdateManager::instance();
+        $manager->updatePlugin($code);
+
+        return true;
+    }
+
+    /**
+     * Tears down a plugin's database tables and rebuilds them.
+     */
+    public function refresh(WinterExtension|ExtensionSource|string $extension): ?bool
+    {
+        if (!($code = $this->resolveExtensionCode($extension))) {
+            return null;
+        }
+
+        $manager = UpdateManager::instance();
+        $manager->rollbackPlugin($code);
+        $manager->updatePlugin($code);
+
+        return true;
+    }
+
+    public function rollback(WinterExtension|string $extension, ?string $targetVersion = null): mixed
+    {
+        if (!($code = $this->resolveExtensionCode($extension))) {
+            return null;
+        }
+
+        UpdateManager::instance()->rollbackPlugin($code, $targetVersion);
+
+        return true;
+    }
+
+    /**
+     * Completely roll back and delete a plugin from the system.
+     */
+    public function uninstall(WinterExtension|string $extension): ?bool
+    {
+        if (!($code = $this->resolveExtensionCode($extension))) {
+            return null;
+        }
+
+        /*
+         * Rollback plugin
+         */
+        UpdateManager::instance()->rollbackPlugin($code);
+
+        /*
+         * Delete from file system
+         */
+        if ($pluginPath = self::instance()->getPluginPath($code)) {
+            File::deleteDirectory($pluginPath);
+
+            // Clear the registration values cache
+            $this->registrationMethodCache = [];
+
+            // Clear the plugin flag cache
+            $this->clearFlagCache();
+        }
+
+        return true;
+    }
+
+    public function getVersionManager(): VersionManager
+    {
+        return $this->versionManager;
+    }
+
+    /**
      * Finds all available plugins and loads them in to the $this->plugins array.
+     * @throws SystemException
      */
     public function loadPlugins(): array
     {
@@ -418,23 +623,6 @@ class PluginManager implements ExtensionManager
     public function exists(PluginBase|string $plugin): bool
     {
         return $this->findByIdentifier($plugin) && !$this->isDisabled($plugin);
-    }
-
-    /**
-     * Returns an array with all enabled plugins
-     *
-     * @return array [$code => $pluginObj]
-     */
-    public function getPlugins(): array
-    {
-        $activePlugins = array_diff_key($this->plugins, $this->pluginFlags);
-        return array_combine(
-            array_map(
-                fn($code) => $this->normalizedMap[$code],
-                array_keys($activePlugins)
-            ),
-            $activePlugins
-        );
     }
 
     /**
@@ -837,66 +1025,39 @@ class PluginManager implements ExtensionManager
     }
 
     /**
-     * Disables the provided plugin using the provided flag (defaults to static::DISABLED_BY_USER)
+     * Get a list of warnings about the current system status
+     * Warns when plugins are missing dependencies and when replaced plugins are still present on the system.
      */
-    public function disablePlugin(PluginBase|string $plugin, string|bool $flag = self::DISABLED_BY_USER): bool
+    public function getWarnings(): array
     {
-        // $flag used to be (bool) $byUser
-        if ($flag === true) {
-            $flag = static::DISABLED_BY_USER;
-        }
+        $warnings = [];
+        $missingDependencies = $this->findMissingDependencies();
 
-        // Flag the plugin as disabled
-        $this->flagPlugin($plugin, $flag);
-
-        // Updates the database record for the plugin if required
-        if ($flag === static::DISABLED_BY_USER) {
-            $record = $this->getPluginRecord($plugin);
-            $record->is_disabled = true;
-            $record->save();
-
-            // Clear the cache so that the next request will regenerate the active flags
+        if (!empty($missingDependencies)) {
             $this->clearFlagCache();
         }
 
-        // Clear the registration values cache
-        $this->registrationMethodCache = [];
-
-        return true;
-    }
-
-    /**
-     * Enables the provided plugin using the provided flag (defaults to static::DISABLED_BY_USER)
-     */
-    public function enablePlugin(PluginBase|string $plugin, $flag = self::DISABLED_BY_USER): bool
-    {
-        // $flag used to be (bool) $byUser
-        if ($flag === true) {
-            $flag = static::DISABLED_BY_USER;
+        foreach ($missingDependencies as $pluginCode => $plugin) {
+            foreach ($plugin as $missingPluginCode) {
+                $warnings[] = Lang::get('system::lang.updates.update_warnings_plugin_missing', [
+                    'code' => '<strong>' . $missingPluginCode . '</strong>',
+                    'parent_code' => '<strong>' . $pluginCode . '</strong>'
+                ]);
+            }
         }
 
-        // Unflag the plugin as disabled
-        $this->unflagPlugin($plugin, $flag);
-
-        // Updates the database record for the plugin if required
-        if ($flag === static::DISABLED_BY_USER) {
-            $record = $this->getPluginRecord($plugin);
-            $record->is_disabled = false;
-            $record->save();
-
-            // Clear the cache so that the next request will regenerate the active flags
-            $this->clearFlagCache();
+        $replacementMap = $this->getReplacementMap();
+        foreach ($replacementMap as $alias => $plugin) {
+            if ($this->getActiveReplacementMap($alias)) {
+                $warnings[] = Lang::get('system::lang.updates.update_warnings_plugin_replace', [
+                    'plugin' => '<strong>' . $plugin . '</strong>',
+                    'alias' => '<strong>' . $alias . '</strong>'
+                ]);
+            }
         }
 
-        // Clear the registration values cache
-        $this->registrationMethodCache = [];
-
-        return true;
+        return $warnings;
     }
-
-    //
-    // Dependencies
-    //
 
     /**
      * Returns the plugin identifiers that are required by the supplied plugin.
@@ -1041,157 +1202,6 @@ class PluginManager implements ExtensionManager
         }
 
         return $this->plugins = $sortedPlugins;
-    }
-
-    /**
-     * Get a list of warnings about the current system status
-     * Warns when plugins are missing dependencies and when replaced plugins are still present on the system.
-     */
-    public function getWarnings(): array
-    {
-        $warnings = [];
-        $missingDependencies = $this->findMissingDependencies();
-
-        if (!empty($missingDependencies)) {
-            $this->clearFlagCache();
-        }
-
-        foreach ($missingDependencies as $pluginCode => $plugin) {
-            foreach ($plugin as $missingPluginCode) {
-                $warnings[] = Lang::get('system::lang.updates.update_warnings_plugin_missing', [
-                    'code' => '<strong>' . $missingPluginCode . '</strong>',
-                    'parent_code' => '<strong>' . $pluginCode . '</strong>'
-                ]);
-            }
-        }
-
-        $replacementMap = $this->getReplacementMap();
-        foreach ($replacementMap as $alias => $plugin) {
-            if ($this->getActiveReplacementMap($alias)) {
-                $warnings[] = Lang::get('system::lang.updates.update_warnings_plugin_replace', [
-                    'plugin' => '<strong>' . $plugin . '</strong>',
-                    'alias' => '<strong>' . $alias . '</strong>'
-                ]);
-            }
-        }
-
-        return $warnings;
-    }
-
-    //
-    // Management
-    //
-
-    /**
-     * Completely roll back and delete a plugin from the system.
-     */
-    public function deletePlugin(string $id): void
-    {
-        /*
-         * Rollback plugin
-         */
-        UpdateManager::instance()->rollbackPlugin($id);
-
-        /*
-         * Delete from file system
-         */
-        if ($pluginPath = self::instance()->getPluginPath($id)) {
-            File::deleteDirectory($pluginPath);
-
-            // Clear the registration values cache
-            $this->registrationMethodCache = [];
-
-            // Clear the plugin flag cache
-            $this->clearFlagCache();
-        }
-    }
-
-    /**
-     * Tears down a plugin's database tables and rebuilds them.
-     */
-    public function refreshPlugin(string $id): void
-    {
-        $manager = UpdateManager::instance();
-        $manager->rollbackPlugin($id);
-        $manager->updatePlugin($id);
-    }
-
-    public function list(): array
-    {
-        // TODO: Implement list() method.
-    }
-
-    public function create(): WinterExtension
-    {
-        // TODO: Implement create() method.
-    }
-
-    public function install(ExtensionSource|WinterExtension|string $extension): WinterExtension
-    {
-        // Insure the in memory plugins match those on disk
-        $this->loadPlugins();
-
-        // Get the plugin code from input and then update the plugin
-        if (!($code = $this->resolveExtensionCode($extension)) || !VersionManager::instance()->updatePlugin($code)) {
-            throw new ApplicationException('Unable to update plugin: ' . $code);
-        }
-
-        // Force a refresh of the plugin
-        $this->refreshPlugin($code);
-
-        // Return an instance of the plugin
-        return $this->findByIdentifier($code);
-    }
-
-    public function isInstalled(ExtensionSource|WinterExtension|string $extension): bool
-    {
-        if (
-            !($code = $this->resolveExtensionCode($extension))
-            || VersionManager::instance()->getCurrentVersion($code) === '0'
-        ) {
-            return false;
-        }
-
-        return true;
-    }
-
-    public function getExtension(WinterExtension|ExtensionSource|string $extension): ?WinterExtension
-    {
-        if (!($code = $this->resolveExtensionCode($extension))) {
-            return null;
-        }
-
-        return $this->findByIdentifier($code);
-    }
-
-    public function enable(WinterExtension|string $extension): mixed
-    {
-        // TODO: Implement enable() method.
-    }
-
-    public function disable(WinterExtension|string $extension): mixed
-    {
-        // TODO: Implement disable() method.
-    }
-
-    public function update(WinterExtension|string $extension): mixed
-    {
-        // TODO: Implement update() method.
-    }
-
-    public function refresh(WinterExtension|string $extension): mixed
-    {
-        // TODO: Implement refresh() method.
-    }
-
-    public function rollback(WinterExtension|string $extension, string $targetVersion): mixed
-    {
-        // TODO: Implement rollback() method.
-    }
-
-    public function uninstall(WinterExtension|string $extension): mixed
-    {
-        // TODO: Implement uninstall() method.
     }
 
     protected function resolveExtensionCode(ExtensionSource|WinterExtension|string $extension): ?string

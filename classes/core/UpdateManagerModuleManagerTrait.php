@@ -13,7 +13,7 @@ trait UpdateManagerModuleManagerTrait
     public function setupMigrations(): static
     {
         $this->repository->createRepository();
-        $this->addMessage(Info::class, 'Migration table created');
+        $this->message($this, 'Migration table created');
 
         return $this;
     }
@@ -45,9 +45,7 @@ trait UpdateManagerModuleManagerTrait
             $this->migrator->setOutput($this->notesOutput);
         }
 
-        $this->out('', true);
-        $this->out(sprintf('<info>Migrating %s module...</info>', $module), true);
-        $this->out('', true);
+        $this->message($this, sprintf('<info>Migrating %s module...</info>', $module), true);
 
         $this->migrator->run(base_path() . '/modules/' . strtolower($module) . '/database/migrations');
 
@@ -64,18 +62,16 @@ trait UpdateManagerModuleManagerTrait
             return $this;
         }
 
-        $this->out('', true);
-        $this->out(sprintf('<info>Seeding %s module...</info>', $module), true);
-        $this->out('', true);
+        $this->message($this, sprintf('<info>Seeding %s module...</info>', $module), true);
 
         $seeder = App::make($className);
         $return = $seeder->run();
 
         if (isset($return) && (is_string($return) || is_array($return))) {
-            $this->addMessage($className, $return);
+            $this->message($className, $return);
         }
 
-        $this->write(Info::class, sprintf('Seeded %s', $module));
+        $this->message($this, sprintf('Seeded %s', $module));
 
         return $this;
     }

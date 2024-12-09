@@ -26,7 +26,7 @@ trait UpdateManagerPluginInstallerTrait
                 throw new ApplicationException(Lang::get('system::lang.plugins.replace.multi_install_error'));
             }
             foreach ($replaces as $replace) {
-                $this->versionManager->replacePlugin($plugin, $replace);
+                $this->pluginManager->getVersionManager()->replacePlugin($plugin, $replace);
             }
         }
 
@@ -69,7 +69,7 @@ trait UpdateManagerPluginInstallerTrait
 
         $this->message($this, sprintf('<info>Migrating %s (%s) plugin...</info>', Lang::get($plugin->pluginDetails()['name']), $name));
 
-        $this->versionManager->updatePlugin($plugin);
+        $this->pluginManager->getVersionManager()->updatePlugin($plugin);
 
         return $this;
     }
@@ -84,25 +84,25 @@ trait UpdateManagerPluginInstallerTrait
     {
         // Remove the plugin database and version
         if (!($plugin = $this->pluginManager->findByIdentifier($name))
-            && $this->versionManager->purgePlugin($name)
+            && $this->pluginManager->getVersionManager()->purgePlugin($name)
         ) {
             $this->message($this, '%s purged from database', $name);
             return $this;
         }
 
-        if ($stopOnVersion && !$this->versionManager->hasDatabaseVersion($plugin, $stopOnVersion)) {
+        if ($stopOnVersion && !$this->pluginManager->getVersionManager()->hasDatabaseVersion($plugin, $stopOnVersion)) {
             throw new ApplicationException(Lang::get('system::lang.updates.plugin_version_not_found'));
         }
 
-        if ($this->versionManager->removePlugin($plugin, $stopOnVersion, true)) {
+        if ($this->pluginManager->getVersionManager()->removePlugin($plugin, $stopOnVersion, true)) {
             $this->message($this, '%s rolled back', $name);
 
-            if ($currentVersion = $this->versionManager->getCurrentVersion($plugin)) {
+            if ($currentVersion = $this->pluginManager->getVersionManager()->getCurrentVersion($plugin)) {
                 $this->message(
                     $this,
                     'Current Version: %s (%s)',
                     $currentVersion,
-                    $this->versionManager->getCurrentVersionNote($plugin)
+                    $this->pluginManager->getVersionManager()->getCurrentVersionNote($plugin)
                 );
             }
 

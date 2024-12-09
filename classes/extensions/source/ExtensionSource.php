@@ -5,7 +5,9 @@ namespace System\Classes\Extensions\Source;
 use Cms\Classes\ThemeManager;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\File;
-use System\Classes\Extensions\ExtensionManager;
+use System\Classes\Extensions\ExtensionManagerInterface;
+use System\Classes\Extensions\ModuleManager;
+use System\Classes\Extensions\PluginManager;
 use System\Classes\Extensions\WinterExtension;
 use System\Classes\Packager\Composer;
 use Winter\Packager\Exceptions\CommandException;
@@ -82,6 +84,19 @@ class ExtensionSource
         return $this->code = $this->guessCodeFromPath($this->path);
     }
 
+    public function getPath(): ?string
+    {
+        if ($this->path) {
+            return $this->path;
+        }
+
+        if (!$this->code) {
+            return null;
+        }
+
+        return $this->path = $this->guessPathFromCode($this->code);
+    }
+
     /**
      * @throws ApplicationException
      */
@@ -123,7 +138,7 @@ class ExtensionSource
         }
 
         if ($this->status === static::STATUS_INSTALLED) {
-            return $this->getExtensionManager()->getExtension($this);
+            return $this->getExtensionManager()->get($this);
         }
 
         return $this->getExtensionManager()->install($this);
@@ -161,7 +176,7 @@ class ExtensionSource
                 break;
             case static::SOURCE_MARKET:
             case static::SOURCE_LOCAL:
-                $path = $this->path ?? $this->guessPackagePath($this->code);
+                $path = $this->path ?? $this->guessPathFromCode($this->code);
                 if (!File::exists($path)) {
                     return static::STATUS_UNINSTALLED;
                 }
@@ -175,12 +190,12 @@ class ExtensionSource
         return static::STATUS_INSTALLED;
     }
 
-    protected function guessPackagePath(string $code): ?string
+    protected function guessPathFromCode(string $code): ?string
     {
         return match ($this->type) {
-            static::TYPE_PLUGIN => plugins_path(str_replace('.', '/', $code)),
-            static::TYPE_THEME => themes_path($code),
-            static::TYPE_MODULE => base_path('modules/' . $code),
+            static::TYPE_PLUGIN => plugins_path(str_replace('.', '/', strtolower($code))),
+            static::TYPE_THEME => themes_path(strtolower($code)),
+            static::TYPE_MODULE => base_path('modules/' . strtolower($code)),
             default => null,
         };
     }

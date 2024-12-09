@@ -1,15 +1,19 @@
-<?php namespace System\Classes;
+<?php
+
+namespace System\Classes\Extensions\Plugins;
 
 use Carbon\Carbon;
-use Db;
-use File;
 use Illuminate\Console\View\Components\Error;
 use Illuminate\Console\View\Components\Info;
 use Illuminate\Console\View\Components\Task;
+use Illuminate\Support\Facades\File;
 use System\Classes\Extensions\PluginBase;
 use System\Classes\Extensions\PluginManager;
+use System\Classes\VersionYamlProcessor;
 use Winter\Storm\Database\Updater;
-use Yaml;
+use Winter\Storm\Support\Facades\DB;
+use Winter\Storm\Support\Facades\Yaml;
+use stdClass;
 
 /**
  * Version manager
@@ -21,23 +25,16 @@ use Yaml;
  */
 class VersionManager
 {
-    use \Winter\Storm\Support\Traits\Singleton;
-
     /**
      * Value when no updates are found.
      */
-    const NO_VERSION_VALUE = 0;
+    public const NO_VERSION_VALUE = '0';
 
     /**
      * Morph types for history table.
      */
-    const HISTORY_TYPE_COMMENT = 'comment';
-    const HISTORY_TYPE_SCRIPT = 'script';
-
-    /**
-     * @var \Illuminate\Console\OutputStyle
-     */
-    protected $notesOutput;
+    public const HISTORY_TYPE_COMMENT = 'comment';
+    public const HISTORY_TYPE_SCRIPT = 'script';
 
     /**
      * Cache of plugin versions as files.
@@ -54,20 +51,14 @@ class VersionManager
      */
     protected $databaseHistory;
 
-    /**
-     * @var Winter\Storm\Database\Updater
-     */
-    protected $updater;
+    protected Updater $updater;
 
-    /**
-     * @var System\Classes\PluginManager
-     */
-    protected $pluginManager;
+    protected PluginManager $pluginManager;
 
-    protected function init()
+    public function __construct(PluginManager $pluginManager)
     {
-        $this->updater = new Updater;
-        $this->pluginManager = PluginManager::instance();
+        $this->pluginManager = $pluginManager;
+        $this->updater = new Updater();
     }
 
     /**
@@ -75,7 +66,7 @@ class VersionManager
      * If the $stopAfterVersion parameter is specified, the process stops after
      * the specified version is applied.
      */
-    public function updatePlugin($plugin, $stopAfterVersion = null)
+    public function updatePlugin($plugin, $stopAfterVersion = null): ?bool
     {
         $code = is_string($plugin) ? $plugin : $this->pluginManager->getIdentifier($plugin);
 
@@ -86,17 +77,15 @@ class VersionManager
         $currentVersion = $this->getLatestFileVersion($code);
         $databaseVersion = $this->getDatabaseVersion($code);
 
-        $this->out('', true);
-
         // No updates needed
         if ($currentVersion === (string) $databaseVersion) {
-            $this->write(Info::class, 'Nothing to migrate.');
-            return;
+            $this->pluginManager->getOutput()->info('Nothing to migrate.');
+            return null;
         }
 
         $newUpdates = $this->getNewFileVersions($code, $databaseVersion);
 
-        $this->write(Info::class, 'Running migrations.');
+        $this->pluginManager->getOutput()->info('Running migrations.');
 
         foreach ($newUpdates as $version => $details) {
             $this->applyPluginUpdate($code, $version, $details);
@@ -106,18 +95,16 @@ class VersionManager
             }
         }
 
-        $this->out('', true);
-
         return true;
     }
 
     /**
      * Update the current replaced plugin's version to reference the replacing plugin.
      */
-    public function replacePlugin(PluginBase $plugin, string $replace)
+    public function replacePlugin(PluginBase $plugin, string $replace): void
     {
         $currentVersion = $this->getDatabaseVersion($replace);
-        if ($currentVersion === self::NO_VERSION_VALUE) {
+        if ($currentVersion === static::NO_VERSION_VALUE) {
             return;
         }
 
@@ -135,7 +122,7 @@ class VersionManager
                 $now = now()->toDateTimeString();
 
                 foreach ($scripts as $script) {
-                    Db::table('system_plugin_history')->insert([
+                    DB::table('system_plugin_history')->insert([
                         'code'       => $code,
                         'type'       => self::HISTORY_TYPE_SCRIPT,
                         'version'    => $version,
@@ -150,10 +137,10 @@ class VersionManager
             }
 
             // delete replaced plugin history
-            Db::table('system_plugin_history')->where('code', $replace)->delete();
+            DB::table('system_plugin_history')->where('code', $replace)->delete();
 
             // replace installed version
-            Db::table('system_plugin_versions')
+            DB::table('system_plugin_versions')
                 ->where('code', '=', $replace)
                 ->update([
                     'code' => $code
@@ -207,16 +194,15 @@ class VersionManager
             $this->setDatabaseVersion($code, $version);
         };
 
-        if (is_null($this->notesOutput)) {
-            $updateFn();
-            return;
-        }
-
-        $this->write(Task::class, sprintf(
-            '<info>%s</info>%s',
-            str_pad($version . ':', 10),
-            (strlen($comments[0]) > 120) ? substr($comments[0], 0, 120) . '...' : $comments[0]
-        ), $updateFn);
+        $this->pluginManager->termwind(
+            Task::class,
+            sprintf(
+                '<info>%s</info>%s',
+                str_pad($version . ':', 10),
+                (strlen($comments[0]) > 120) ? substr($comments[0], 0, 120) . '...' : $comments[0]
+            ),
+            $updateFn
+        );
     }
 
     /**
@@ -297,12 +283,12 @@ class VersionManager
      */
     public function purgePlugin($pluginCode)
     {
-        $versions = Db::table('system_plugin_versions')->where('code', $pluginCode);
+        $versions = DB::table('system_plugin_versions')->where('code', $pluginCode);
         if ($countVersions = $versions->count()) {
             $versions->delete();
         }
 
-        $history = Db::table('system_plugin_history')->where('code', $pluginCode);
+        $history = DB::table('system_plugin_history')->where('code', $pluginCode);
         if ($countHistory = $history->count()) {
             $history->delete();
         }
@@ -434,11 +420,11 @@ class VersionManager
     protected function getDatabaseVersion($code)
     {
         if ($this->databaseVersions === null) {
-            $this->databaseVersions = Db::table('system_plugin_versions')->lists('version', 'code');
+            $this->databaseVersions = DB::table('system_plugin_versions')->lists('version', 'code');
         }
 
         if (!isset($this->databaseVersions[$code])) {
-            $this->databaseVersions[$code] = Db::table('system_plugin_versions')
+            $this->databaseVersions[$code] = DB::table('system_plugin_versions')
                 ->where('code', $code)
                 ->value('version');
         }
@@ -454,18 +440,18 @@ class VersionManager
         $currentVersion = $this->getDatabaseVersion($code);
 
         if ($version && !$currentVersion) {
-            Db::table('system_plugin_versions')->insert([
+            DB::table('system_plugin_versions')->insert([
                 'code'       => $code,
                 'version'    => $version,
                 'created_at' => new Carbon
             ]);
         } elseif ($version && $currentVersion) {
-            Db::table('system_plugin_versions')->where('code', $code)->update([
+            DB::table('system_plugin_versions')->where('code', $code)->update([
                 'version'    => $version,
                 'created_at' => new Carbon
             ]);
         } elseif ($currentVersion) {
-            Db::table('system_plugin_versions')->where('code', $code)->delete();
+            DB::table('system_plugin_versions')->where('code', $code)->delete();
         }
 
         $this->databaseVersions[$code] = $version;
@@ -476,7 +462,7 @@ class VersionManager
      */
     protected function applyDatabaseComment($code, $version, $comment)
     {
-        Db::table('system_plugin_history')->insert([
+        DB::table('system_plugin_history')->insert([
             'code'       => $code,
             'type'       => self::HISTORY_TYPE_COMMENT,
             'version'    => $version,
@@ -490,7 +476,7 @@ class VersionManager
      */
     protected function removeDatabaseComment($code, $version)
     {
-        Db::table('system_plugin_history')
+        DB::table('system_plugin_history')
             ->where('code', $code)
             ->where('type', self::HISTORY_TYPE_COMMENT)
             ->where('version', $version)
@@ -514,7 +500,7 @@ class VersionManager
 
         $this->updater->setUp($updateFile);
 
-        Db::table('system_plugin_history')->insert([
+        DB::table('system_plugin_history')->insert([
             'code'       => $code,
             'type'       => self::HISTORY_TYPE_SCRIPT,
             'version'    => $version,
@@ -535,7 +521,7 @@ class VersionManager
 
         $this->updater->packDown($updateFile);
 
-        Db::table('system_plugin_history')
+        DB::table('system_plugin_history')
             ->where('code', $code)
             ->where('type', self::HISTORY_TYPE_SCRIPT)
             ->where('version', $version)
@@ -552,7 +538,7 @@ class VersionManager
             return $this->databaseHistory[$code];
         }
 
-        $historyInfo = Db::table('system_plugin_history')
+        $historyInfo = DB::table('system_plugin_history')
             ->where('code', $code)
             ->orderBy('id')
             ->get()
@@ -569,7 +555,7 @@ class VersionManager
      */
     protected function getLastHistory($code)
     {
-        return Db::table('system_plugin_history')
+        return DB::table('system_plugin_history')
             ->where('code', $code)
             ->orderBy('id', 'DESC')
             ->first();
@@ -600,54 +586,6 @@ class VersionManager
         }
 
         return false;
-    }
-
-    //
-    // Notes
-    //
-
-    /**
-     * Writes output to the console using a Laravel CLI View component.
-     *
-     * @param \Illuminate\Console\View\Components\Component $component
-     * @param array $arguments
-     * @return static
-     */
-    protected function write($component, ...$arguments)
-    {
-        if ($this->notesOutput !== null) {
-            with(new $component($this->notesOutput))->render(...$arguments);
-        }
-
-        return $this;
-    }
-
-    /**
-     * Writes output to the console.
-     *
-     * @param string $message
-     * @param bool $newline
-     * @return static
-     */
-    protected function out($message, $newline = false)
-    {
-        if ($this->notesOutput !== null) {
-            $this->notesOutput->write($message, $newline);
-        }
-
-        return $this;
-    }
-
-    /**
-     * Sets an output stream for writing notes.
-     * @param \Illuminate\Console\OutputStyle $output
-     * @return self
-     */
-    public function setNotesOutput($output)
-    {
-        $this->notesOutput = $output;
-
-        return $this;
     }
 
     /**

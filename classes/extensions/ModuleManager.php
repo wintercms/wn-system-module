@@ -2,7 +2,7 @@
 
 namespace System\Classes\Extensions;
 
-class ModuleManager implements ExtensionManager
+class ModuleManager implements ExtensionManagerInterface
 {
     public function list(): array
     {

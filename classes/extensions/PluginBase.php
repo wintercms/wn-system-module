@@ -5,7 +5,7 @@ use Composer\Semver\Semver;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\ServiceProvider as ServiceProviderBase;
 use ReflectionClass;
-use System\Classes\VersionManager;
+use System\Classes\Extensions\Plugins\VersionManager;
 use System\Classes\VersionYamlProcessor;
 use Winter\Storm\Exception\SystemException;
 use Winter\Storm\Foundation\Application;
@@ -446,7 +446,7 @@ abstract class PluginBase extends ServiceProviderBase implements WinterExtension
 
         $versions = $this->getPluginVersions();
         if (empty($versions)) {
-            return $this->version = (string) VersionManager::NO_VERSION_VALUE;
+            return $this->version = VersionManager::NO_VERSION_VALUE;
         }
 
         return $this->version = trim(key(array_slice($versions, -1, 1)));
