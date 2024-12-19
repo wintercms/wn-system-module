@@ -21,4 +21,13 @@ trait InteractsWithZip
 
         @unlink($archive);
     }
+
+    public function packArchive(string $src, string $destination): string
+    {
+        if (!Zip::make($destination, $src)) {
+            throw new ApplicationException(Lang::get('system::lang.zip.pack_failed', ['file' => $src]));
+        }
+
+        return $destination;
+    }
 }

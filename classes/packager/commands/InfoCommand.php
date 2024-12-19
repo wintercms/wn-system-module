@@ -23,10 +23,6 @@ class InfoCommand extends BaseCommand
      */
     public function handle(?string $package = null): void
     {
-        if (!$package) {
-            throw new CommandException('Must provide a package');
-        }
-
         $this->package = $package;
     }
 
@@ -35,16 +31,24 @@ class InfoCommand extends BaseCommand
      */
     public function arguments(): array
     {
-        return [
-            'packages' => [$this->package]
+        $arguments = [
+            '--format' => 'json',
         ];
+
+        if (!$this->package) {
+            return $arguments;
+        }
+
+        $arguments['package'] = $this->package;
+
+        return $arguments;
     }
 
     /**
      * @throws CommandException
      * @throws WorkDirException
      */
-    public function execute(): string
+    public function execute(): array
     {
         $output = $this->runComposerCommand();
         $message = implode(PHP_EOL, $output['output']);
@@ -53,7 +57,11 @@ class InfoCommand extends BaseCommand
             throw new CommandException($message);
         }
 
-        return $message;
+        $result = json_decode($message, JSON_OBJECT_AS_ARRAY);
+
+        return $this->package
+            ? $result ?? []
+            : $result['installed'] ?? [];
     }
 
     /**

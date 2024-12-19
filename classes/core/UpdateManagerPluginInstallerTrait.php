@@ -26,7 +26,7 @@ trait UpdateManagerPluginInstallerTrait
                 throw new ApplicationException(Lang::get('system::lang.plugins.replace.multi_install_error'));
             }
             foreach ($replaces as $replace) {
-                $this->pluginManager->getVersionManager()->replacePlugin($plugin, $replace);
+                $this->pluginManager->versionManager()->replacePlugin($plugin, $replace);
             }
         }
 
@@ -55,7 +55,6 @@ trait UpdateManagerPluginInstallerTrait
         return $this;
     }
 
-
     /**
      * Runs update on a single plugin
      */
@@ -63,13 +62,13 @@ trait UpdateManagerPluginInstallerTrait
     {
         // Update the plugin database and version
         if (!($plugin = $this->pluginManager->findByIdentifier($name))) {
-            $this->message($this, sprintf('Unable to find plugin %s', $name));
+            $this->pluginManager->getOutput()->info(sprintf('Unable to find plugin %s', $name));
             return $this;
         }
 
-        $this->message($this, sprintf('<info>Migrating %s (%s) plugin...</info>', Lang::get($plugin->pluginDetails()['name']), $name));
+        $this->pluginManager->getOutput()->info(sprintf('<info>Migrating %s (%s) plugin...</info>', Lang::get($plugin->pluginDetails()['name']), $name));
 
-        $this->pluginManager->getVersionManager()->updatePlugin($plugin);
+        $this->pluginManager->versionManager()->updatePlugin($plugin);
 
         return $this;
     }
@@ -84,25 +83,25 @@ trait UpdateManagerPluginInstallerTrait
     {
         // Remove the plugin database and version
         if (!($plugin = $this->pluginManager->findByIdentifier($name))
-            && $this->pluginManager->getVersionManager()->purgePlugin($name)
+            && $this->pluginManager->versionManager()->purgePlugin($name)
         ) {
-            $this->message($this, '%s purged from database', $name);
+            $this->pluginManager->getOutput()->info(sprintf('%s purged from database', $name));
             return $this;
         }
 
-        if ($stopOnVersion && !$this->pluginManager->getVersionManager()->hasDatabaseVersion($plugin, $stopOnVersion)) {
+        if ($stopOnVersion && !$this->pluginManager->versionManager()->hasDatabaseVersion($plugin, $stopOnVersion)) {
             throw new ApplicationException(Lang::get('system::lang.updates.plugin_version_not_found'));
         }
 
-        if ($this->pluginManager->getVersionManager()->removePlugin($plugin, $stopOnVersion, true)) {
-            $this->message($this, '%s rolled back', $name);
+        if ($this->pluginManager->versionManager()->removePlugin($plugin, $stopOnVersion, true)) {
+            $this->pluginManager->getOutput()->info(sprintf('%s rolled back', $name));
 
-            if ($currentVersion = $this->pluginManager->getVersionManager()->getCurrentVersion($plugin)) {
+            if ($currentVersion = $this->pluginManager->versionManager()->getCurrentVersion($plugin)) {
                 $this->message(
                     $this,
                     'Current Version: %s (%s)',
                     $currentVersion,
-                    $this->pluginManager->getVersionManager()->getCurrentVersionNote($plugin)
+                    $this->pluginManager->versionManager()->getCurrentVersionNote($plugin)
                 );
             }
 

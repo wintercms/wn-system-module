@@ -82,7 +82,6 @@ class UpdateCommand extends Update
 
     public function execute()
     {
-        Cache::forget(Composer::COMPOSER_CACHE_KEY);
         return parent::execute();
     }
 }

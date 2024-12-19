@@ -45,9 +45,13 @@ interface ExtensionManagerInterface
 
     public function update(WinterExtension|string $extension): mixed;
 
+    public function availableUpdates(WinterExtension|string|null $extension = null): ?array;
+
     public function refresh(WinterExtension|string $extension): mixed;
 
     public function rollback(WinterExtension|string $extension, string $targetVersion): mixed;
 
     public function uninstall(WinterExtension|string $extension): mixed;
+
+    public function tearDown(): static;
 }

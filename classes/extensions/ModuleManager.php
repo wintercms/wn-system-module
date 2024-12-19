@@ -2,6 +2,8 @@
 
 namespace System\Classes\Extensions;
 
+use System\Classes\Extensions\Source\ExtensionSource;
+
 class ModuleManager implements ExtensionManagerInterface
 {
     public function list(): array
@@ -9,22 +11,22 @@ class ModuleManager implements ExtensionManagerInterface
         // TODO: Implement list() method.
     }
 
-    public function create(): WinterExtension
+    public function create(string $extension): WinterExtension
     {
         // TODO: Implement create() method.
     }
 
-    public function install(WinterExtension|string $extension): WinterExtension
+    public function install(WinterExtension|ExtensionSource|string $extension): WinterExtension
     {
         // TODO: Implement install() method.
     }
 
-    public function enable(WinterExtension|string $extension): mixed
+    public function enable(WinterExtension|string $extension, string|bool $flag = self::DISABLED_BY_USER): mixed
     {
         // TODO: Implement enable() method.
     }
 
-    public function disable(WinterExtension|string $extension): mixed
+    public function disable(WinterExtension|string $extension, string|bool $flag = self::DISABLED_BY_USER): mixed
     {
         // TODO: Implement disable() method.
     }
@@ -47,5 +49,15 @@ class ModuleManager implements ExtensionManagerInterface
     public function uninstall(WinterExtension|string $extension): mixed
     {
         // TODO: Implement uninstall() method.
+    }
+
+    public function isInstalled(WinterExtension|ExtensionSource|string $extension): bool
+    {
+        // TODO: Implement isInstalled() method.
+    }
+
+    public function get(WinterExtension|ExtensionSource|string $extension): ?WinterExtension
+    {
+        // TODO: Implement get() method.
     }
 }

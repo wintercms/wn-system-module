@@ -4,20 +4,24 @@ namespace System\Classes\Extensions;
 
 use Backend\Classes\NavigationManager;
 use FilesystemIterator;
+use Illuminate\Console\View\Components\Info;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\View;
 use InvalidArgumentException;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use System\Classes\ComposerManager;
 use System\Classes\Extensions\Plugins\PluginManagerDeprecatedMethodsTrait;
-use System\Classes\Extensions\Plugins\VersionManager;
+use System\Classes\Extensions\Plugins\PluginUpdateManager;
+use System\Classes\Extensions\Plugins\PluginVersionManager;
 use System\Classes\Extensions\Source\ExtensionSource;
+use System\Classes\Packager\Composer;
 use System\Classes\SettingsManager;
 use System\Classes\UpdateManager;
 use System\Models\PluginVersion;
@@ -47,9 +51,9 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
     protected Application $app;
 
     /**
-     * @var VersionManager Handles versioning of plugins in the database.
+     * @var PluginVersionManager Handles versioning of plugins in the database.
      */
-    protected VersionManager $versionManager;
+    protected PluginVersionManager $versionManager;
 
     /**
      * @var PluginBase[] Container array used for storing plugin information objects.
@@ -109,7 +113,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         $this->app = App::make('app');
 
         // Define the version manager
-        $this->versionManager = new VersionManager($this);
+        $this->versionManager = new PluginVersionManager($this);
 
         // Load the plugins from the filesystem and sort them by dependencies
         $this->loadPlugins();
@@ -141,15 +145,22 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
 
     public function create(string $extension): WinterExtension
     {
+        $this->renderComponent(Info::class, sprintf('Running command `create:plugin %s`.', $extension));
+
         Artisan::call('create:plugin', [
-            'plugin' => $extension
-        ]);
+            'plugin' => $extension,
+            '--uninspiring' => true,
+        ], $this->getOutput());
+
+        $this->renderComponent(Info::class, 'Reloading loaded plugins...');
 
         // Insure the in memory plugins match those on disk
         $this->loadPlugins();
 
         // Force a refresh of the plugin
         $this->refresh($extension);
+
+        $this->renderComponent(Info::class, 'Plugin created successfully.');
 
         // Return an instance of the plugin
         return $this->findByIdentifier($extension);
@@ -265,14 +276,63 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
             return null;
         }
 
-        $manager = UpdateManager::instance();
-        $manager->updatePlugin($code);
+        // Update the plugin database and version
+        if (!($plugin = $this->findByIdentifier($code))) {
+            $this->getOutput()->info(sprintf('Unable to find plugin %s', $code));
+            return null;
+        }
+
+        $this->output->info(sprintf(
+            'Migrating %s (%s) plugin...',
+            Lang::get($plugin->pluginDetails()['name']),
+            $code
+        ));
+
+        if (
+            ($composerPackage = $plugin->getComposerPackageName())
+            && Composer::updateAvailable($composerPackage)
+        ) {
+            Preserver::instance()->store($plugin);
+            $update = Composer::update(package: $composerPackage);
+            dd($update);
+        } elseif (false /* Detect if market */) {
+            Preserver::instance()->store($plugin);
+            // @TODO: Update files from market
+        }
+
+        $this->versionManager->updatePlugin($plugin);
 
         return true;
     }
 
+    public function availableUpdates(WinterExtension|string|null $extension = null): ?array
+    {
+        $toCheck = $extension ? [$this->findByIdentifier($extension)] : $this->list();
+
+        $composerUpdates = Composer::getAvailableUpdates();
+
+        $updates = [];
+        foreach ($toCheck as $plugin) {
+            if ($plugin->getComposerPackageName()) {
+                if (isset($composerUpdates[$plugin->getComposerPackageName()])) {
+                    $updates[] = [
+                        'name' => $plugin->getPluginIdentifier(),
+                        'from' => $composerUpdates[$plugin->getComposerPackageName()][0],
+                        'to' => $composerUpdates[$plugin->getComposerPackageName()][1],
+                    ];
+                }
+                continue;
+            }
+
+            // @TODO: Check api
+        }
+
+        return $updates;
+    }
+
     /**
      * Tears down a plugin's database tables and rebuilds them.
+     * @throws ApplicationException
      */
     public function refresh(WinterExtension|ExtensionSource|string $extension): ?bool
     {
@@ -280,26 +340,57 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
             return null;
         }
 
-        $manager = UpdateManager::instance();
-        $manager->rollbackPlugin($code);
-        $manager->updatePlugin($code);
-
-        return true;
-    }
-
-    public function rollback(WinterExtension|string $extension, ?string $targetVersion = null): mixed
-    {
-        if (!($code = $this->resolveExtensionCode($extension))) {
-            return null;
-        }
-
-        UpdateManager::instance()->rollbackPlugin($code, $targetVersion);
+        $this->rollback($code);
+        $this->update($code);
 
         return true;
     }
 
     /**
+     * @throws ApplicationException
+     * @throws \Exception
+     */
+    public function rollback(WinterExtension|string $extension, ?string $targetVersion = null): ?PluginBase
+    {
+        if (!($code = $this->resolveExtensionCode($extension))) {
+            return null;
+        }
+
+        // Remove the plugin database and version
+        if (
+            !($plugin = $this->findByIdentifier($code))
+            && $this->versionManager->purgePlugin($code)
+        ) {
+            $this->output->info(sprintf('%s purged from database', $code));
+            return $plugin;
+        }
+
+        if ($targetVersion && !$this->versionManager->hasDatabaseVersion($plugin, $targetVersion)) {
+            throw new ApplicationException(Lang::get('system::lang.updates.plugin_version_not_found'));
+        }
+
+        if ($this->versionManager->removePlugin($plugin, $targetVersion, true)) {
+            $this->output->info(sprintf('%s rolled back', $code));
+
+            if ($currentVersion = $this->versionManager->getCurrentVersion($plugin)) {
+                $this->output->info(sprintf(
+                    'Current Version: %s (%s)',
+                    $currentVersion,
+                    $this->versionManager->getCurrentVersionNote($plugin)
+                ));
+            }
+
+            return $plugin;
+        }
+
+        $this->output->error(sprintf('Unable to find plugin %s', $code));
+
+        return null;
+    }
+
+    /**
      * Completely roll back and delete a plugin from the system.
+     * @throws ApplicationException
      */
     public function uninstall(WinterExtension|string $extension): ?bool
     {
@@ -310,7 +401,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         /*
          * Rollback plugin
          */
-        UpdateManager::instance()->rollbackPlugin($code);
+        $this->rollback($code);
 
         /*
          * Delete from file system
@@ -328,7 +419,16 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         return true;
     }
 
-    public function getVersionManager(): VersionManager
+    public function tearDown(): static
+    {
+        foreach ($this->getAllPlugins() as $plugin) {
+            $this->uninstall($plugin);
+        }
+
+        return $this;
+    }
+
+    public function versionManager(): PluginVersionManager
     {
         return $this->versionManager;
     }
@@ -378,6 +478,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
                 return null;
             }
 
+            /* @var PluginBase $className */
             $pluginObj = new $className($this->app);
         } catch (\Throwable $e) {
             Log::error('Plugin ' . $className . ' could not be instantiated.', [
@@ -394,6 +495,8 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
 
         $this->plugins[$lowerClassId] = $pluginObj;
         $this->normalizedMap[$lowerClassId] = $classId;
+
+        $pluginObj->setComposerPackage(Composer::getPackageInfoByPath($path));
 
         $replaces = $pluginObj->getReplaces();
         if ($replaces) {
@@ -799,7 +902,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         }
 
         $results = [];
-        $plugins = $this->getPlugins();
+        $plugins = $this->list();
 
         foreach ($plugins as $id => $plugin) {
             if (!is_callable([$plugin, $methodName])) {
@@ -1204,7 +1307,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         return $this->plugins = $sortedPlugins;
     }
 
-    protected function resolveExtensionCode(ExtensionSource|WinterExtension|string $extension): ?string
+    public function resolveExtensionCode(ExtensionSource|WinterExtension|string $extension): ?string
     {
         if (is_string($extension)) {
             return $this->getNormalizedIdentifier($extension);
@@ -1217,5 +1320,14 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         }
 
         return null;
+    }
+
+    public function resolveExtension(ExtensionSource|WinterExtension|string $extension): ?PluginBase
+    {
+        if ($extension instanceof PluginBase) {
+            return $extension;
+        }
+
+        return $this->findByIdentifier($extension instanceof ExtensionSource ? $extension->getCode() : $extension);
     }
 }

@@ -10,7 +10,7 @@ use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Support\Facades\App;
 use System\Classes\Core\MarketPlaceApi;
 use System\Classes\Extensions\PluginManager;
-use System\Classes\Extensions\Plugins\VersionManager;
+use System\Classes\Extensions\Plugins\PluginVersionManager;
 use System\Helpers\Cache as CacheHelper;
 use System\Models\Parameter;
 use Winter\Storm\Exception\ApplicationException;

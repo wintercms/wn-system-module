@@ -7,6 +7,7 @@ use Illuminate\Console\View\Components\Component;
 use Illuminate\Contracts\Container\Container;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
+use Termwind\Termwind;
 
 abstract class ExtensionManager
 {
@@ -31,7 +32,7 @@ abstract class ExtensionManager
         return $this->output;
     }
 
-    public function termwind(string $component, ...$args): void
+    public function renderComponent(string $component, ...$args): void
     {
         (new $component($this->output))->render(...$args);
     }

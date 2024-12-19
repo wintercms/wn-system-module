@@ -13,7 +13,9 @@ interface WinterExtension
 
     public function extensionUpdate(): static;
 
+    public function extensionPath(): string;
 
-//    public function freeze(): WinterExtension;
-//    public function unfreeze(): WinterExtension;
+    public function extensionVersion(): string;
+
+    public function extensionIdentifier(): string;
 }

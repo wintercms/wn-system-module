@@ -23,7 +23,7 @@ use stdClass;
  * @package winter\wn-system-module
  * @author Alexey Bobkov, Samuel Georges
  */
-class VersionManager
+class PluginVersionManager
 {
     /**
      * Value when no updates are found.
@@ -194,7 +194,7 @@ class VersionManager
             $this->setDatabaseVersion($code, $version);
         };
 
-        $this->pluginManager->termwind(
+        $this->pluginManager->renderComponent(
             Task::class,
             sprintf(
                 '<info>%s</info>%s',
@@ -203,6 +203,9 @@ class VersionManager
             ),
             $updateFn
         );
+
+        // @TODO: do better
+        $this->pluginManager->getOutput()->writeln('');
     }
 
     /**
@@ -279,9 +282,9 @@ class VersionManager
     /**
      * Deletes all records from the version and history tables for a plugin.
      * @param string $pluginCode Plugin code
-     * @return void
+     * @return bool
      */
-    public function purgePlugin($pluginCode)
+    public function purgePlugin(string $pluginCode): bool
     {
         $versions = DB::table('system_plugin_versions')->where('code', $pluginCode);
         if ($countVersions = $versions->count()) {

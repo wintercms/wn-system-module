@@ -5,7 +5,7 @@ use Composer\Semver\Semver;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\ServiceProvider as ServiceProviderBase;
 use ReflectionClass;
-use System\Classes\Extensions\Plugins\VersionManager;
+use System\Classes\Extensions\Plugins\PluginVersionManager;
 use System\Classes\VersionYamlProcessor;
 use Winter\Storm\Exception\SystemException;
 use Winter\Storm\Foundation\Application;
@@ -37,6 +37,11 @@ abstract class PluginBase extends ServiceProviderBase implements WinterExtension
      * @var string The absolute path to this plugin's directory, access with getPluginPath()
      */
     protected $path;
+
+    /**
+     * @var ?array The composer package details for this plugin.
+     */
+    protected ?array $composerPackage = null;
 
     /**
      * @var string The version of this plugin as reported by updates/version.yaml, access with getPluginVersion()
@@ -446,7 +451,7 @@ abstract class PluginBase extends ServiceProviderBase implements WinterExtension
 
         $versions = $this->getPluginVersions();
         if (empty($versions)) {
-            return $this->version = VersionManager::NO_VERSION_VALUE;
+            return $this->version = PluginVersionManager::NO_VERSION_VALUE;
         }
 
         return $this->version = trim(key(array_slice($versions, -1, 1)));
@@ -488,6 +493,30 @@ abstract class PluginBase extends ServiceProviderBase implements WinterExtension
         }
 
         return $versions;
+    }
+
+    /**
+     * Set the composer package property for the plugin
+     */
+    public function setComposerPackage(?array $package): void
+    {
+        $this->composerPackage = $package;
+    }
+
+    /**
+     * Get the composer package details
+     */
+    public function getComposerPackage(): ?array
+    {
+        return $this->composerPackage;
+    }
+
+    /**
+     * Get the composer package name
+     */
+    public function getComposerPackageName(): ?string
+    {
+        return $this->composerPackage['name'] ?? null;
     }
 
     /**
@@ -575,5 +604,20 @@ abstract class PluginBase extends ServiceProviderBase implements WinterExtension
     {
         // TODO: Implement update() method.
         return $this;
+    }
+
+    public function extensionVersion(): string
+    {
+        return $this->getPluginVersion();
+    }
+
+    public function extensionPath(): string
+    {
+        return $this->getPluginPath();
+    }
+
+    public function extensionIdentifier(): string
+    {
+        return strtolower($this->getPluginIdentifier());
     }
 }
