@@ -107,6 +107,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
 
     /**
      * Initializes the plugin manager
+     * @throws SystemException
      */
     protected function init(): void
     {
@@ -143,6 +144,10 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         );
     }
 
+    /**
+     * @throws SystemException
+     * @throws ApplicationException
+     */
     public function create(string $extension): WinterExtension
     {
         $this->renderComponent(Info::class, sprintf('Running command `create:plugin %s`.', $extension));
@@ -166,6 +171,10 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         return $this->findByIdentifier($extension);
     }
 
+    /**
+     * @throws ApplicationException
+     * @throws SystemException
+     */
     public function install(ExtensionSource|WinterExtension|string $extension): WinterExtension
     {
         // Insure the in memory plugins match those on disk
@@ -278,8 +287,36 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
 
         // Update the plugin database and version
         if (!($plugin = $this->findByIdentifier($code))) {
-            $this->getOutput()->info(sprintf('Unable to find plugin %s', $code));
+            $this->output->info(sprintf('Unable to find plugin %s', $code));
             return null;
+        }
+
+        $pluginName = Lang::get($plugin->pluginDetails()['name']);
+
+        if (
+            !$this->getPluginRecord($plugin)->is_frozen
+            && ($composerPackage = $plugin->getComposerPackageName())
+            && Composer::updateAvailable($composerPackage)
+        ) {
+            $this->output->info(sprintf(
+                'Performing composer update for %s (%s) plugin...',
+                $pluginName,
+                $code
+            ));
+
+            Preserver::instance()->store($plugin);
+            $update = Composer::update(package: $composerPackage, dryRun: true);
+
+            $versions = $update->getUpgraded()[$composerPackage] ?? null;
+
+            $this->output->{$versions ? 'info' : 'error'}(
+                $versions
+                    ? sprintf('Updated plugin %s (%s) from v%s => v%s', $pluginName, $code, $versions[0], $versions[1])
+                    : sprintf('Failed to update plugin %s (%s)', $pluginName, $code)
+            );
+        } elseif (false /* Detect if market */) {
+            Preserver::instance()->store($plugin);
+            // @TODO: Update files from market
         }
 
         $this->output->info(sprintf(
@@ -287,18 +324,6 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
             Lang::get($plugin->pluginDetails()['name']),
             $code
         ));
-
-        if (
-            ($composerPackage = $plugin->getComposerPackageName())
-            && Composer::updateAvailable($composerPackage)
-        ) {
-            Preserver::instance()->store($plugin);
-            $update = Composer::update(package: $composerPackage);
-            dd($update);
-        } elseif (false /* Detect if market */) {
-            Preserver::instance()->store($plugin);
-            // @TODO: Update files from market
-        }
 
         $this->versionManager->updatePlugin($plugin);
 
