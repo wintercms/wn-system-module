@@ -43,7 +43,7 @@ interface ExtensionManagerInterface
 
     public function disable(WinterExtension|string $extension, string|bool $flag = self::DISABLED_BY_USER): mixed;
 
-    public function update(WinterExtension|string $extension): mixed;
+    public function update(WinterExtension|string|null $extension): mixed;
 
     public function availableUpdates(WinterExtension|string|null $extension = null): ?array;
 

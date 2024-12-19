@@ -1,9 +1,7 @@
 <?php namespace System\Console;
 
-use File;
 use InvalidArgumentException;
-use System\Classes\VersionManager;
-use System\Console\BaseScaffoldCommand;
+use System\Classes\Extensions\Plugins\PluginVersionManager;
 use Winter\Storm\Database\Model;
 use Winter\Storm\Support\Str;
 use Yaml;
@@ -184,7 +182,7 @@ class CreateMigration extends BaseScaffoldCommand
             $version = $this->option('for-version');
         } else {
             $currentVersion = $this->getPlugin()->getPluginVersion();
-            if ($currentVersion === VersionManager::NO_VERSION_VALUE) {
+            if ($currentVersion === PluginVersionManager::NO_VERSION_VALUE) {
                 throw new InvalidArgumentException('The plugin [' . $this->getPluginIdentifier() . '] does not have a version set and no --version option was provided. Please set a version in the plugin\'s updates/version.yaml file.');
             }
             $version = $this->getNextVersion($currentVersion);

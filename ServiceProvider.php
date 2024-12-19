@@ -13,7 +13,9 @@ use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\View;
 use System\Classes\CombineAssets;
 use System\Classes\ErrorHandler;
+use System\Classes\Extensions\ModuleManager;
 use System\Classes\Extensions\PluginManager;
+use System\Classes\Extensions\WinterExtension;
 use System\Classes\FileManifest;
 use System\Classes\MailManager;
 use System\Classes\MarkupManager;
@@ -26,6 +28,7 @@ use System\Models\MailSetting;
 use System\Twig\Engine as TwigEngine;
 use Twig\Environment;
 use Twig\Extension\CoreExtension;
+use Winter\Storm\Console\Command;
 use Winter\Storm\Exception\SystemException;
 use Winter\Storm\Router\Helper as RouterHelper;
 use Winter\Storm\Support\ClassLoader;
@@ -34,14 +37,14 @@ use Winter\Storm\Support\Facades\Markdown;
 use Winter\Storm\Support\Facades\Validator;
 use Winter\Storm\Support\ModuleServiceProvider;
 
-class ServiceProvider extends ModuleServiceProvider
+class ServiceProvider extends ModuleServiceProvider implements WinterExtension
 {
     /**
      * Register the service provider.
      *
      * @return void
      */
-    public function register()
+    public function register(): void
     {
         parent::register();
 
@@ -89,6 +92,18 @@ class ServiceProvider extends ModuleServiceProvider
             $this->registerBackendNavigation();
             $this->registerBackendReportWidgets();
             $this->registerBackendSettings();
+        }
+
+        /*
+         * Console specific
+         */
+        if ($this->app->runningInConsole()) {
+            Command::extend(function (Command $command) {
+                $command->bindEvent('beforeRun', function () use ($command) {
+                    ModuleManager::instance()->setOutput($command->getOutput());
+                    PluginManager::instance()->setOutput($command->getOutput());
+                });
+            });
         }
     }
 
@@ -342,6 +357,9 @@ class ServiceProvider extends ModuleServiceProvider
         $this->registerConsoleCommand('npm.install', Console\Asset\Npm\NpmInstall::class);
         $this->registerConsoleCommand('npm.update', Console\Asset\Npm\NpmUpdate::class);
         $this->registerConsoleCommand('npm.version', Console\Asset\Npm\NpmVersion::class);
+
+        // @TODO: remove
+        $this->registerConsoleCommand('jax.test', Console\JaxTest::class);
     }
 
     /*
@@ -671,5 +689,20 @@ class ServiceProvider extends ModuleServiceProvider
     protected function registerGlobalViewVars()
     {
         View::share('appName', Config::get('app.name'));
+    }
+
+    public function getPath(): string
+    {
+        return __DIR__;
+    }
+
+    public function getVersion(): string
+    {
+        // TODO: Implement extensionVersion() method.
+    }
+
+    public function getIdentifier(): string
+    {
+        return 'System';
     }
 }

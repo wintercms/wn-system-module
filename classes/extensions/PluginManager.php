@@ -279,7 +279,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         return true;
     }
 
-    public function update(WinterExtension|string $extension): ?bool
+    public function update(WinterExtension|string|null $extension): ?bool
     {
         if (!($code = $this->resolveExtensionCode($extension))) {
             return null;

@@ -7,7 +7,7 @@ use ReflectionClass;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use System\Classes\Extensions\PluginManager;
-use System\Classes\Extensions\Plugins\VersionManager;
+use System\Classes\Extensions\Plugins\PluginVersionManager;
 use System\Classes\UpdateManager;
 use Winter\Storm\Database\Model as ActiveRecord;
 
@@ -51,7 +51,7 @@ class PluginManagerTestCase extends TestCase
         UpdateManager::forgetInstance();
 
         // Forces plugin migrations to be run again on every test
-        VersionManager::forgetInstance();
+        PluginVersionManager::forgetInstance();
 
         $this->output = new OutputStyle(
             new ArrayInput([]),
