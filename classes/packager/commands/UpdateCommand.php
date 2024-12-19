@@ -52,6 +52,10 @@ class UpdateCommand extends Update
     {
         $arguments = [];
 
+        if ($this->package) {
+            $arguments['packages'] = [$this->package];
+        }
+
         if ($this->dryRun) {
             $arguments['--dry-run'] = true;
         }
@@ -70,11 +74,6 @@ class UpdateCommand extends Update
 
         if (in_array($this->installPreference, [self::PREFER_DIST, self::PREFER_SOURCE])) {
             $arguments['--prefer-' . $this->installPreference] = true;
-        }
-
-        if ($this->package) {
-            $arguments['--'] = true;
-            $arguments[$this->package] = true;
         }
 
         return $arguments;
