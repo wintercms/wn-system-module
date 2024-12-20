@@ -27,6 +27,9 @@ interface ExtensionManagerInterface
     public const DISABLED_BY_USER = 'disabled-user';
     public const DISABLED_BY_CONFIG = 'disabled-config';
 
+    /**
+     * @return array<string, WinterExtension>
+     */
     public function list(): array;
 
     public function create(string $extension): WinterExtension;
@@ -53,6 +56,4 @@ interface ExtensionManagerInterface
     public function rollback(WinterExtension|string|null $extension = null, ?string $targetVersion = null): mixed;
 
     public function uninstall(WinterExtension|string|null $extension = null): mixed;
-
-    public function tearDown(): static;
 }

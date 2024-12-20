@@ -39,9 +39,12 @@ class ModuleManager extends ExtensionManager implements ExtensionManagerInterfac
         return $this;
     }
 
+    /**
+     * @return array<string, WinterExtension>
+     */
     public function list(): array
     {
-        return Config::get('cms.loadModules', []);
+        return array_merge(...array_map(fn($key) => [$key => $this->get($key)], Config::get('cms.loadModules', [])));
     }
 
     public function create(string $extension): WinterExtension
@@ -51,17 +54,28 @@ class ModuleManager extends ExtensionManager implements ExtensionManagerInterfac
 
     public function install(WinterExtension|ExtensionSource|string $extension): WinterExtension
     {
-        // TODO: Implement install() method.
+        // Get the module code from input and then update the module
+        if (!($code = $this->resolveIdentifier($extension))) {
+            throw new ApplicationException('Unable to update module: ' . $code);
+        }
+
+        // Force a refresh of the module
+        $this->refresh($code);
+
+        // Return an instance of the module
+        return $this->get($code);
     }
 
     public function enable(WinterExtension|string $extension, string|bool $flag = self::DISABLED_BY_USER): mixed
     {
         // TODO: Implement enable() method.
+        throw new ApplicationException('Support for enabling modules needs implementing');
     }
 
     public function disable(WinterExtension|string $extension, string|bool $flag = self::DISABLED_BY_USER): mixed
     {
         // TODO: Implement disable() method.
+        throw new ApplicationException('Support for disabling modules needs implementing');
     }
 
     /**
@@ -141,7 +155,8 @@ class ModuleManager extends ExtensionManager implements ExtensionManagerInterfac
 
     public function refresh(WinterExtension|string|null $extension = null): mixed
     {
-        // TODO: Implement refresh() method.
+        $this->rollback($extension);
+        return $this->update($extension, migrationsOnly: true);
     }
 
     /**
@@ -164,19 +179,27 @@ class ModuleManager extends ExtensionManager implements ExtensionManagerInterfac
             }
         }
 
-        Schema::dropIfExists(UpdateManager::instance()->getMigrationTableName());
-
         return true;
     }
 
     public function uninstall(WinterExtension|string|null $extension = null): mixed
     {
-        // TODO: Implement uninstall() method.
+        $modules = $this->getModuleList($extension);
+        foreach ($modules as $module) {
+            $this->rollback($module);
+        }
+
+        // System uninstall
+        if (!$extension) {
+            Schema::dropIfExists(UpdateManager::instance()->getMigrationTableName());
+        }
+
+        return true;
     }
 
     public function isInstalled(WinterExtension|ExtensionSource|string $extension): bool
     {
-        // TODO: Implement isInstalled() method.
+        return !!$this->get($extension);
     }
 
     public function get(WinterExtension|ExtensionSource|string $extension): ?WinterExtension
@@ -204,12 +227,23 @@ class ModuleManager extends ExtensionManager implements ExtensionManagerInterfac
 
     public function availableUpdates(WinterExtension|string|null $extension = null): ?array
     {
-        // TODO: Implement availableUpdates() method.
-    }
+        $updates = [];
+        $composerUpdates = null;
+        foreach ($this->list() as $name => $module) {
+            if ($composerPackage = $module->getComposerPackageName()) {
+                if (!$composerUpdates) {
+                    $composerUpdates = Composer::getAvailableUpdates();
+                }
 
-    public function tearDown(): static
-    {
-        // TODO: Implement tearDown() method.
+                if (isset($composerUpdates[$composerPackage])) {
+                    $updates[$name] = $composerUpdates[$composerPackage];
+                }
+            } else {
+                // @TODO: api check
+            }
+        }
+
+        return $updates;
     }
 
     protected function getModuleList(WinterExtension|string|null $extension = null): array

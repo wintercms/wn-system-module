@@ -179,7 +179,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         $this->loadPlugins();
 
         // Get the plugin code from input and then update the plugin
-        if (!($code = $this->resolveExtensionCode($extension)) || !$this->versionManager->updatePlugin($code)) {
+        if (!($code = $this->resolveIdentifier($extension)) || !$this->versionManager->updatePlugin($code)) {
             throw new ApplicationException('Unable to update plugin: ' . $code);
         }
 
@@ -193,7 +193,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
     public function isInstalled(ExtensionSource|WinterExtension|string $extension): bool
     {
         if (
-            !($code = $this->resolveExtensionCode($extension))
+            !($code = $this->resolveIdentifier($extension))
             || $this->versionManager->getCurrentVersion($code) === '0'
         ) {
             return false;
@@ -204,7 +204,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
 
     public function get(WinterExtension|ExtensionSource|string $extension): ?WinterExtension
     {
-        if (!($code = $this->resolveExtensionCode($extension))) {
+        if (!($code = $this->resolveIdentifier($extension))) {
             return null;
         }
 
@@ -283,7 +283,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
      */
     public function update(WinterExtension|string|null $extension = null, bool $migrationsOnly = false): ?bool
     {
-        if (!($code = $this->resolveExtensionCode($extension))) {
+        if (!($code = $this->resolveIdentifier($extension))) {
             return null;
         }
 
@@ -360,7 +360,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
      */
     public function refresh(WinterExtension|ExtensionSource|string|null $extension = null): ?bool
     {
-        if (!($code = $this->resolveExtensionCode($extension))) {
+        if (!($code = $this->resolveIdentifier($extension))) {
             return null;
         }
 
@@ -376,7 +376,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
      */
     public function rollback(WinterExtension|string|null $extension = null, ?string $targetVersion = null): ?PluginBase
     {
-        if (!($code = $this->resolveExtensionCode($extension))) {
+        if (!($code = $this->resolveIdentifier($extension))) {
             return null;
         }
 
@@ -418,7 +418,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
      */
     public function uninstall(WinterExtension|string|null $extension = null): ?bool
     {
-        if (!($code = $this->resolveExtensionCode($extension))) {
+        if (!($code = $this->resolveIdentifier($extension))) {
             return null;
         }
 
@@ -1361,7 +1361,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         return $this->plugins = $sortedPlugins;
     }
 
-    public function resolveExtensionCode(ExtensionSource|WinterExtension|string $extension): ?string
+    public function resolveIdentifier(ExtensionSource|WinterExtension|string $extension): ?string
     {
         if (is_string($extension)) {
             return $this->getNormalizedIdentifier($extension);
@@ -1374,14 +1374,5 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         }
 
         return null;
-    }
-
-    public function resolveExtension(ExtensionSource|WinterExtension|string $extension): ?PluginBase
-    {
-        if ($extension instanceof PluginBase) {
-            return $extension;
-        }
-
-        return $this->findByIdentifier($extension instanceof ExtensionSource ? $extension->getCode() : $extension);
     }
 }
