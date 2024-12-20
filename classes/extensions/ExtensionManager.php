@@ -7,7 +7,9 @@ use Illuminate\Console\View\Components\Component;
 use Illuminate\Contracts\Container\Container;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
+use System\Classes\Extensions\Source\ExtensionSource;
 use Termwind\Termwind;
+use Winter\Storm\Foundation\Extension\WinterExtension;
 
 abstract class ExtensionManager
 {
@@ -35,6 +37,20 @@ abstract class ExtensionManager
     public function renderComponent(string $component, ...$args): void
     {
         (new $component($this->output))->render(...$args);
+    }
+
+    protected function resolve(WinterExtension|ExtensionSource|string $extension): ?WinterExtension
+    {
+        if ($extension instanceof WinterExtension) {
+            return $extension;
+        }
+
+        return $this->get($extension instanceof ExtensionSource ? $extension->getCode() : $extension);
+    }
+
+    protected function resolveIdentifier(WinterExtension|ExtensionSource|string $extension): ?string
+    {
+        return $this->resolve($extension)?->getIdentifier();
     }
 
     /**

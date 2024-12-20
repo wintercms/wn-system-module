@@ -11,23 +11,21 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\View;
 use InvalidArgumentException;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use System\Classes\ComposerManager;
 use System\Classes\Extensions\Plugins\PluginManagerDeprecatedMethodsTrait;
-use System\Classes\Extensions\Plugins\PluginUpdateManager;
 use System\Classes\Extensions\Plugins\PluginVersionManager;
 use System\Classes\Extensions\Source\ExtensionSource;
-use System\Classes\Packager\Composer;
 use System\Classes\SettingsManager;
-use System\Classes\UpdateManager;
 use System\Models\PluginVersion;
 use Winter\Storm\Exception\ApplicationException;
 use Winter\Storm\Exception\SystemException;
 use Winter\Storm\Foundation\Application;
+use Winter\Storm\Foundation\Extension\WinterExtension;
+use Winter\Storm\Packager\Composer;
 use Winter\Storm\Support\ClassLoader;
 use Winter\Storm\Support\Facades\Config;
 use Winter\Storm\Support\Facades\File;
@@ -279,7 +277,11 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         return true;
     }
 
-    public function update(WinterExtension|string|null $extension): ?bool
+    /**
+     * @throws SystemException
+     * @throws ApplicationException
+     */
+    public function update(WinterExtension|string|null $extension = null, bool $migrationsOnly = false): ?bool
     {
         if (!($code = $this->resolveExtensionCode($extension))) {
             return null;
@@ -293,38 +295,35 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
 
         $pluginName = Lang::get($plugin->pluginDetails()['name']);
 
-        if (
-            !$this->getPluginRecord($plugin)->is_frozen
-            && ($composerPackage = $plugin->getComposerPackageName())
-            && Composer::updateAvailable($composerPackage)
-        ) {
-            $this->output->info(sprintf(
-                'Performing composer update for %s (%s) plugin...',
-                $pluginName,
-                $code
-            ));
+        if (!$migrationsOnly) {
+            if (
+                !$this->getPluginRecord($plugin)->is_frozen
+                && ($composerPackage = $plugin->getComposerPackageName())
+                && Composer::updateAvailable($composerPackage)
+            ) {
+                $this->output->info(sprintf(
+                    'Performing composer update for %s (%s) plugin...',
+                    $pluginName,
+                    $code
+                ));
 
-            Preserver::instance()->store($plugin);
-            $update = Composer::update(package: $composerPackage, dryRun: true);
+                Preserver::instance()->store($plugin);
+                $update = Composer::update(dryRun: true, package: $composerPackage);
 
-            $versions = $update->getUpgraded()[$composerPackage] ?? null;
+                $versions = $update->getUpgraded()[$composerPackage] ?? null;
 
-            $this->output->{$versions ? 'info' : 'error'}(
-                $versions
-                    ? sprintf('Updated plugin %s (%s) from v%s => v%s', $pluginName, $code, $versions[0], $versions[1])
-                    : sprintf('Failed to update plugin %s (%s)', $pluginName, $code)
-            );
-        } elseif (false /* Detect if market */) {
-            Preserver::instance()->store($plugin);
-            // @TODO: Update files from market
+                $this->output->{$versions ? 'info' : 'error'}(
+                    $versions
+                        ? sprintf('Updated plugin %s (%s) from v%s => v%s', $pluginName, $code, $versions[0], $versions[1])
+                        : sprintf('Failed to update plugin %s (%s)', $pluginName, $code)
+                );
+            } elseif (false /* Detect if market */) {
+                Preserver::instance()->store($plugin);
+                // @TODO: Update files from market
+            }
         }
 
-        $this->output->info(sprintf(
-            'Migrating %s (%s) plugin...',
-            Lang::get($plugin->pluginDetails()['name']),
-            $code
-        ));
-
+        $this->output->info(sprintf('Migrating %s (%s) plugin...', $pluginName, $code));
         $this->versionManager->updatePlugin($plugin);
 
         return true;
@@ -359,7 +358,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
      * Tears down a plugin's database tables and rebuilds them.
      * @throws ApplicationException
      */
-    public function refresh(WinterExtension|ExtensionSource|string $extension): ?bool
+    public function refresh(WinterExtension|ExtensionSource|string|null $extension = null): ?bool
     {
         if (!($code = $this->resolveExtensionCode($extension))) {
             return null;
@@ -375,7 +374,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
      * @throws ApplicationException
      * @throws \Exception
      */
-    public function rollback(WinterExtension|string $extension, ?string $targetVersion = null): ?PluginBase
+    public function rollback(WinterExtension|string|null $extension = null, ?string $targetVersion = null): ?PluginBase
     {
         if (!($code = $this->resolveExtensionCode($extension))) {
             return null;
@@ -417,7 +416,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
      * Completely roll back and delete a plugin from the system.
      * @throws ApplicationException
      */
-    public function uninstall(WinterExtension|string $extension): ?bool
+    public function uninstall(WinterExtension|string|null $extension = null): ?bool
     {
         if (!($code = $this->resolveExtensionCode($extension))) {
             return null;
@@ -824,6 +823,36 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         }
 
         return $classNames;
+    }
+
+    /**
+     * Finds all plugins in a given path by looking for valid Plugin.php files
+     */
+    public function findPluginsInPath(string $path): array
+    {
+        $pluginFiles = [];
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST
+        );
+
+        foreach ($iterator as $file) {
+            if ($file->isFile() && $file->getFilename() === 'Plugin.php') {
+                // Attempt to extract the plugin's code
+                if (!preg_match('/namespace (.+?);/', file_get_contents($file->getRealPath()), $match)) {
+                    continue;
+                }
+
+                $code = str_replace('\\', '.', $match[1]);
+
+                if (str_contains($code, '.')) {
+                    $pluginFiles[$code] = $file->getPathname();
+                }
+            }
+        }
+
+        return $pluginFiles;
     }
 
     /**

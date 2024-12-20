@@ -1,4 +1,6 @@
-<?php namespace System\Classes\Extensions;
+<?php
+
+namespace System\Classes\Extensions;
 
 use Backend\Facades\Backend;
 use Composer\Semver\Semver;
@@ -9,11 +11,13 @@ use System\Classes\Extensions\Plugins\PluginVersionManager;
 use System\Classes\VersionYamlProcessor;
 use Winter\Storm\Exception\SystemException;
 use Winter\Storm\Foundation\Application;
+use Winter\Storm\Foundation\Extension\WinterExtension;
 use Winter\Storm\Support\Facades\File;
 use Winter\Storm\Support\Facades\Html;
 use Winter\Storm\Support\Facades\Markdown;
 use Winter\Storm\Support\Facades\Yaml;
 use Winter\Storm\Support\Str;
+use Winter\Storm\Support\Traits\HasComposerPackage;
 
 /**
  * Plugin base class
@@ -23,6 +27,8 @@ use Winter\Storm\Support\Str;
  */
 abstract class PluginBase extends ServiceProviderBase implements WinterExtension
 {
+    use HasComposerPackage;
+
     /**
      * @var Application The application instance.
      */
@@ -37,11 +43,6 @@ abstract class PluginBase extends ServiceProviderBase implements WinterExtension
      * @var string The absolute path to this plugin's directory, access with getPluginPath()
      */
     protected $path;
-
-    /**
-     * @var ?array The composer package details for this plugin.
-     */
-    protected ?array $composerPackage = null;
 
     /**
      * @var string The version of this plugin as reported by updates/version.yaml, access with getPluginVersion()
@@ -493,30 +494,6 @@ abstract class PluginBase extends ServiceProviderBase implements WinterExtension
         }
 
         return $versions;
-    }
-
-    /**
-     * Set the composer package property for the plugin
-     */
-    public function setComposerPackage(?array $package): void
-    {
-        $this->composerPackage = $package;
-    }
-
-    /**
-     * Get the composer package details
-     */
-    public function getComposerPackage(): ?array
-    {
-        return $this->composerPackage;
-    }
-
-    /**
-     * Get the composer package name
-     */
-    public function getComposerPackageName(): ?string
-    {
-        return $this->composerPackage['name'] ?? null;
     }
 
     /**

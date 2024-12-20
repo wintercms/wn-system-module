@@ -6,8 +6,8 @@ use Illuminate\Support\Facades\Lang;
 use System\Classes\Extensions\ExtensionUpdateManager;
 use System\Classes\Extensions\ExtensionUpdateManagerInterface;
 use System\Classes\Extensions\PluginManager;
-use System\Classes\Extensions\WinterExtension;
-use System\Classes\Packager\Composer;
+use Winter\Storm\Foundation\Extension\WinterExtension;
+use Winter\Storm\Packager\Composer;
 use Winter\Storm\Exception\ApplicationException;
 
 class PluginUpdateManager extends ExtensionUpdateManager implements ExtensionUpdateManagerInterface

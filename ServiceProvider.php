@@ -1,4 +1,6 @@
-<?php namespace System;
+<?php
+
+namespace System;
 
 use Backend;
 use Backend\Classes\WidgetManager;
@@ -15,7 +17,7 @@ use System\Classes\CombineAssets;
 use System\Classes\ErrorHandler;
 use System\Classes\Extensions\ModuleManager;
 use System\Classes\Extensions\PluginManager;
-use System\Classes\Extensions\WinterExtension;
+use Winter\Storm\Foundation\Extension\WinterExtension;
 use System\Classes\FileManifest;
 use System\Classes\MailManager;
 use System\Classes\MarkupManager;

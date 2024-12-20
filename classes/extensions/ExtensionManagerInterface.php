@@ -4,6 +4,7 @@ namespace System\Classes\Extensions;
 
 use System\Classes\Extensions\Source\ExtensionSource;
 use Winter\Storm\Exception\ApplicationException;
+use Winter\Storm\Foundation\Extension\WinterExtension;
 
 interface ExtensionManagerInterface
 {
@@ -33,7 +34,7 @@ interface ExtensionManagerInterface
     /**
      * @throws ApplicationException If the installation fails
      */
-    public function install(ExtensionSource|WinterExtension|string $extension): WinterExtension;
+    public function install(ExtensionSource|WinterExtension|string $extension ): WinterExtension;
 
     public function isInstalled(ExtensionSource|WinterExtension|string $extension): bool;
 
@@ -43,15 +44,15 @@ interface ExtensionManagerInterface
 
     public function disable(WinterExtension|string $extension, string|bool $flag = self::DISABLED_BY_USER): mixed;
 
-    public function update(WinterExtension|string|null $extension): mixed;
+    public function update(WinterExtension|string|null $extension = null, bool $migrationsOnly = false): mixed;
 
     public function availableUpdates(WinterExtension|string|null $extension = null): ?array;
 
-    public function refresh(WinterExtension|string $extension): mixed;
+    public function refresh(WinterExtension|string|null $extension = null): mixed;
 
-    public function rollback(WinterExtension|string $extension, string $targetVersion): mixed;
+    public function rollback(WinterExtension|string|null $extension = null, ?string $targetVersion = null): mixed;
 
-    public function uninstall(WinterExtension|string $extension): mixed;
+    public function uninstall(WinterExtension|string|null $extension = null): mixed;
 
     public function tearDown(): static;
 }
