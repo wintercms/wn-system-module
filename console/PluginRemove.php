@@ -4,6 +4,7 @@ use File;
 use System\Classes\Extensions\PluginManager;
 use System\Classes\UpdateManager;
 use Winter\Storm\Console\Command;
+use Winter\Storm\Exception\ApplicationException;
 
 /**
  * Console command to remove a plugin.
@@ -44,13 +45,14 @@ class PluginRemove extends Command
 
     /**
      * Execute the console command.
+     * @throws ApplicationException
      */
     public function handle(): int
     {
         $pluginName = $this->getPluginIdentifier();
-        $pluginManager = PluginManager::instance();
 
         $confirmQuestion = sprintf('This will remove the files for the "%s" plugin.', $pluginName);
+
         if (!$this->option('no-rollback')) {
             $confirmQuestion = sprintf('This will remove the database tables and files for the "%s" plugin.', $pluginName);
         }
@@ -62,21 +64,7 @@ class PluginRemove extends Command
             return 1;
         }
 
-        if (!$this->option('no-rollback')) {
-            /*
-            * Rollback plugin
-            */
-            $manager = UpdateManager::instance()->setNotesOutput($this->output);
-            $manager->rollbackPlugin($pluginName);
-        }
-
-        /*
-         * Delete from file system
-         */
-        if ($pluginPath = $pluginManager->getPluginPath($pluginName)) {
-            File::deleteDirectory($pluginPath);
-            $this->output->writeln(sprintf('<info>Deleted: %s</info>', $pluginPath));
-        }
+        PluginManager::instance()->uninstall($pluginName, $this->option('no-rollback'));
 
         return 0;
     }

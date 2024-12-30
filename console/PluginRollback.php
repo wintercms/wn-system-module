@@ -1,6 +1,7 @@
 <?php namespace System\Console;
 
 use InvalidArgumentException;
+use System\Classes\Extensions\PluginManager;
 use Winter\Storm\Console\Command;
 use System\Classes\UpdateManager;
 use System\Classes\VersionManager;
@@ -43,9 +44,10 @@ class PluginRollback extends Command
     {
         $pluginName = $this->getPluginIdentifier();
         $stopOnVersion = ltrim(($this->argument('version') ?: null), 'v');
+        $pluginManager = PluginManager::instance();
 
         if ($stopOnVersion) {
-            if (!VersionManager::instance()->hasDatabaseVersion($pluginName, $stopOnVersion)) {
+            if (!$pluginManager->versionManager()->hasDatabaseVersion($pluginName, $stopOnVersion)) {
                 throw new InvalidArgumentException('Plugin version not found');
             }
             $confirmQuestion = "This will revert $pluginName to version $stopOnVersion - changes to the database and potential data loss may occur.";
@@ -60,12 +62,10 @@ class PluginRollback extends Command
             return 1;
         }
 
-        $manager = UpdateManager::instance()->setNotesOutput($this->output);
-
         try {
-            $manager->rollbackPlugin($pluginName, $stopOnVersion);
+            $pluginManager->rollback($pluginName, $stopOnVersion);
         } catch (\Exception $exception) {
-            $lastVersion = VersionManager::instance()->getCurrentVersion($pluginName);
+            $lastVersion = $pluginManager->versionManager()->getCurrentVersion($pluginName);
             $this->output->writeln(sprintf("<comment>An exception occurred during the rollback and the process has been stopped. %s was rolled back to version v%s.</comment>", $pluginName, $lastVersion));
             throw $exception;
         }
@@ -82,7 +82,7 @@ class PluginRollback extends Command
         $pluginName = $this->getPluginIdentifier($allInput['arguments']['plugin']);
 
         // Get that plugin's versions from the database
-        $history = VersionManager::instance()->getDatabaseHistory($pluginName);
+        $history = PluginManager::instance()->versionManager()->getDatabaseHistory($pluginName);
 
         // Compile a list of available versions to rollback to
         $availableVersions = [];

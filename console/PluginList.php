@@ -2,6 +2,7 @@
 
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Helper\TableSeparator;
+use System\Classes\Extensions\PluginManager;
 use System\Models\PluginVersion;
 use Winter\Storm\Console\Command;
 
@@ -34,6 +35,7 @@ class PluginList extends Command
      */
     public function handle()
     {
+        $manager = PluginManager::instance();
         $allPlugins  = PluginVersion::all();
         $pluginsCount = count($allPlugins);
 
@@ -47,11 +49,12 @@ class PluginList extends Command
             $rows[] = [
                 $plugin->code,
                 $plugin->version,
+                $manager->findByIdentifier($plugin->code)->getComposerPackageName(),
                 (!$plugin->is_frozen) ? '<info>Yes</info>': '<fg=red>No</>',
                 (!$plugin->is_disabled) ? '<info>Yes</info>': '<fg=red>No</>',
             ];
         }
 
-        $this->table(['Plugin name', 'Version', 'Updates enabled', 'Plugin enabled'], $rows);
+        $this->table(['Plugin name', 'Version', 'Composer Package', 'Updates enabled', 'Plugin enabled'], $rows);
     }
 }

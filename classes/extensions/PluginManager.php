@@ -416,20 +416,18 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
      * Completely roll back and delete a plugin from the system.
      * @throws ApplicationException
      */
-    public function uninstall(WinterExtension|string|null $extension = null): ?bool
+    public function uninstall(WinterExtension|string|null $extension = null, bool $noRollback = false): ?bool
     {
         if (!($code = $this->resolveIdentifier($extension))) {
             return null;
         }
 
-        /*
-         * Rollback plugin
-         */
-        $this->rollback($code);
+        // Rollback plugin
+        if (!$noRollback) {
+            $this->rollback($code);
+        }
 
-        /*
-         * Delete from file system
-         */
+        // Delete from file system
         if ($pluginPath = self::instance()->getPluginPath($code)) {
             File::deleteDirectory($pluginPath);
 
@@ -439,6 +437,8 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
             // Clear the plugin flag cache
             $this->clearFlagCache();
         }
+
+        $this->output->info('Deleted plugin: ' . $code);
 
         return true;
     }

@@ -4,7 +4,6 @@ namespace System\Classes\Extensions\Plugins;
 
 use Carbon\Carbon;
 use Illuminate\Console\View\Components\Error;
-use Illuminate\Console\View\Components\Info;
 use Illuminate\Console\View\Components\Task;
 use Illuminate\Support\Facades\File;
 use System\Classes\Extensions\PluginBase;

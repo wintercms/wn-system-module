@@ -88,7 +88,7 @@ class MarketPlaceApi
             throw new ApplicationException('Invalid request option.');
         }
 
-        return $this->api->fetch(
+        return $this->fetch(
             $request,
             [$request === static::REQUEST_PROJECT_DETAIL ? 'id' : 'name' => $identifier]
         );

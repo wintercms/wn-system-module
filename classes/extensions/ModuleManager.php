@@ -92,12 +92,11 @@ class ModuleManager extends ExtensionManager implements ExtensionManagerInterfac
             $this->output->info('Migration table created');
         }
 
-        if (!$migrationsOnly) {
+        if (!$migrationsOnly && !Config::get('cms.disableCoreUpdates')) {
             foreach ($modules as $module) {
                 $extension = $this->get($module);
                 if (
-                    !Config::get('cms.disableCoreUpdates')
-                    && ($composerPackage = Composer::getPackageNameByExtension($extension))
+                    ($composerPackage = Composer::getPackageNameByExtension($extension))
                     && Composer::updateAvailable($composerPackage)
                 ) {
                     $this->output->info(sprintf(
@@ -246,16 +245,21 @@ class ModuleManager extends ExtensionManager implements ExtensionManagerInterfac
         return $updates;
     }
 
+    /**
+     * @param WinterExtension|string|null $extension
+     * @return array<string, WinterExtension>
+     * @throws ApplicationException
+     */
     protected function getModuleList(WinterExtension|string|null $extension = null): array
     {
         if (!$extension) {
             return $this->list();
         }
 
-        if (!($resolved = $this->resolveIdentifier($extension))) {
+        if (!($resolved = $this->resolve($extension))) {
             throw new ApplicationException('Unable to locate extension');
         }
 
-        return [$resolved];
+        return [$resolved->getIdentifier() => $resolved];
     }
 }

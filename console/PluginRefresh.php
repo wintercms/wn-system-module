@@ -1,5 +1,6 @@
 <?php namespace System\Console;
 
+use System\Classes\Extensions\PluginManager;
 use Winter\Storm\Console\Command;
 use System\Classes\UpdateManager;
 
@@ -48,15 +49,7 @@ class PluginRefresh extends Command
             return 1;
         }
 
-        // Set the UpdateManager output stream to the CLI
-        $manager = UpdateManager::instance()->setNotesOutput($this->output);
-
-        // Rollback the plugin
-        $manager->rollbackPlugin($pluginName);
-
-        // Reinstall the plugin
-        $this->output->writeln('<info>Reinstalling plugin...</info>');
-        $manager->updatePlugin($pluginName);
+        PluginManager::instance()->refresh($pluginName);
 
         return 0;
     }

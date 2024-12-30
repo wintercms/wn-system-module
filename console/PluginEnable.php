@@ -41,11 +41,10 @@ class PluginEnable extends Command
     public function handle()
     {
         $pluginName = $this->getPluginIdentifier();
-        $pluginManager = PluginManager::instance();
 
         // Enable this plugin
-        $pluginManager->enablePlugin($pluginName);
+        PluginManager::instance()->enable($pluginName);
 
-        $this->output->writeln(sprintf('<info>%s:</info> enabled.', $pluginName));
+        $this->output->info($pluginName . ': enabled.');
     }
 }

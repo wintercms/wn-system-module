@@ -36,11 +36,10 @@ class PluginDisable extends Command
     public function handle()
     {
         $pluginName = $this->getPluginIdentifier();
-        $pluginManager = PluginManager::instance();
 
         // Disable this plugin
-        $pluginManager->disablePlugin($pluginName);
+        PluginManager::instance()->disable($pluginName);
 
-        $this->output->writeln(sprintf('<info>%s:</info> disabled.', $pluginName));
+        $this->output->info($pluginName . ': disabled.');
     }
 }
