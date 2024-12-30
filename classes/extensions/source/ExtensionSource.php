@@ -5,6 +5,7 @@ namespace System\Classes\Extensions\Source;
 use Cms\Classes\ThemeManager;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\File;
+use System\Classes\Extensions\ExtensionManager;
 use System\Classes\Extensions\ExtensionManagerInterface;
 use System\Classes\Extensions\ModuleManager;
 use System\Classes\Extensions\PluginManager;
@@ -144,13 +145,18 @@ class ExtensionSource
         return $this->getExtensionManager()->install($this);
     }
 
+    /**
+     * @throws ApplicationException
+     */
     public function uninstall(): bool
     {
         if ($this->status !== static::STATUS_INSTALLED) {
             throw new ApplicationException('Extension source is not installed');
         }
 
-        return $this->getExtensionManager()->uninstall($this);
+        return $this->getExtensionManager()->uninstall(
+            $this->getExtensionManager()->get($this)
+        );
     }
 
     protected function getExtensionManager(): ExtensionManager
