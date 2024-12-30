@@ -17,7 +17,6 @@ use System\Classes\CombineAssets;
 use System\Classes\ErrorHandler;
 use System\Classes\Extensions\ModuleManager;
 use System\Classes\Extensions\PluginManager;
-use Winter\Storm\Foundation\Extension\WinterExtension;
 use System\Classes\FileManifest;
 use System\Classes\MailManager;
 use System\Classes\MarkupManager;
@@ -32,6 +31,7 @@ use Twig\Environment;
 use Twig\Extension\CoreExtension;
 use Winter\Storm\Console\Command;
 use Winter\Storm\Exception\SystemException;
+use Winter\Storm\Foundation\Extension\WinterExtension;
 use Winter\Storm\Router\Helper as RouterHelper;
 use Winter\Storm\Support\ClassLoader;
 use Winter\Storm\Support\Facades\Event;
@@ -314,34 +314,34 @@ class ServiceProvider extends ModuleServiceProvider implements WinterExtension
         /*
          * Register console commands
          */
-        $this->registerConsoleCommand('create.command', \System\Console\CreateCommand::class);
-        $this->registerConsoleCommand('create.job', \System\Console\CreateJob::class);
-        $this->registerConsoleCommand('create.migration', \System\Console\CreateMigration::class);
-        $this->registerConsoleCommand('create.model', \System\Console\CreateModel::class);
-        $this->registerConsoleCommand('create.factory', \System\Console\CreateFactory::class);
-        $this->registerConsoleCommand('create.plugin', \System\Console\CreatePlugin::class);
-        $this->registerConsoleCommand('create.settings', \System\Console\CreateSettings::class);
-        $this->registerConsoleCommand('create.test', \System\Console\CreateTest::class);
+        $this->registerConsoleCommand('create.command', Console\Create\CreateCommand::class);
+        $this->registerConsoleCommand('create.job', Console\Create\CreateJob::class);
+        $this->registerConsoleCommand('create.migration', Console\Create\CreateMigration::class);
+        $this->registerConsoleCommand('create.model', Console\Create\CreateModel::class);
+        $this->registerConsoleCommand('create.factory', Console\Create\CreateFactory::class);
+        $this->registerConsoleCommand('create.plugin', Console\Create\CreatePlugin::class);
+        $this->registerConsoleCommand('create.settings', Console\Create\CreateSettings::class);
+        $this->registerConsoleCommand('create.test', Console\Create\CreateTest::class);
 
-        $this->registerConsoleCommand('winter.up', \System\Console\WinterUp::class);
-        $this->registerConsoleCommand('winter.down', \System\Console\WinterDown::class);
-        $this->registerConsoleCommand('winter.update', \System\Console\WinterUpdate::class);
-        $this->registerConsoleCommand('winter.util', \System\Console\WinterUtil::class);
-        $this->registerConsoleCommand('winter.mirror', \System\Console\WinterMirror::class);
-        $this->registerConsoleCommand('winter.fresh', \System\Console\WinterFresh::class);
-        $this->registerConsoleCommand('winter.env', \System\Console\WinterEnv::class);
-        $this->registerConsoleCommand('winter.install', \System\Console\WinterInstall::class);
-        $this->registerConsoleCommand('winter.version', \System\Console\WinterVersion::class);
-        $this->registerConsoleCommand('winter.manifest', \System\Console\WinterManifest::class);
-        $this->registerConsoleCommand('winter.test', \System\Console\WinterTest::class);
+        $this->registerConsoleCommand('winter.up', Console\WinterUp::class);
+        $this->registerConsoleCommand('winter.down', Console\WinterDown::class);
+        $this->registerConsoleCommand('winter.update', Console\WinterUpdate::class);
+        $this->registerConsoleCommand('winter.util', Console\WinterUtil::class);
+        $this->registerConsoleCommand('winter.mirror', Console\WinterMirror::class);
+        $this->registerConsoleCommand('winter.fresh', Console\WinterFresh::class);
+        $this->registerConsoleCommand('winter.env', Console\WinterEnv::class);
+        $this->registerConsoleCommand('winter.install', Console\WinterInstall::class);
+        $this->registerConsoleCommand('winter.version', Console\WinterVersion::class);
+        $this->registerConsoleCommand('winter.manifest', Console\WinterManifest::class);
+        $this->registerConsoleCommand('winter.test', Console\WinterTest::class);
 
-        $this->registerConsoleCommand('plugin.install', \System\Console\PluginInstall::class);
-        $this->registerConsoleCommand('plugin.remove', \System\Console\PluginRemove::class);
-        $this->registerConsoleCommand('plugin.disable', \System\Console\PluginDisable::class);
-        $this->registerConsoleCommand('plugin.enable', \System\Console\PluginEnable::class);
-        $this->registerConsoleCommand('plugin.refresh', \System\Console\PluginRefresh::class);
-        $this->registerConsoleCommand('plugin.rollback', \System\Console\PluginRollback::class);
-        $this->registerConsoleCommand('plugin.list', \System\Console\PluginList::class);
+        $this->registerConsoleCommand('plugin.install', Console\Plugin\PluginInstall::class);
+        $this->registerConsoleCommand('plugin.remove', Console\Plugin\PluginRemove::class);
+        $this->registerConsoleCommand('plugin.disable', Console\Plugin\PluginDisable::class);
+        $this->registerConsoleCommand('plugin.enable', Console\Plugin\PluginEnable::class);
+        $this->registerConsoleCommand('plugin.refresh', Console\Plugin\PluginRefresh::class);
+        $this->registerConsoleCommand('plugin.rollback', Console\Plugin\PluginRollback::class);
+        $this->registerConsoleCommand('plugin.list', Console\Plugin\PluginList::class);
 
         $this->registerConsoleCommand('mix.compile', Console\Asset\Mix\MixCompile::class);
         $this->registerConsoleCommand('mix.config', Console\Asset\Mix\MixCreate::class);

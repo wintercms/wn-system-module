@@ -1,8 +1,9 @@
-<?php namespace System\Console;
+<?php
 
-use File;
+namespace System\Console\Plugin;
+
 use System\Classes\Extensions\PluginManager;
-use System\Classes\UpdateManager;
+use System\Console\Traits;
 use Winter\Storm\Console\Command;
 use Winter\Storm\Exception\ApplicationException;
 

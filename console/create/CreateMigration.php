@@ -1,7 +1,10 @@
-<?php namespace System\Console;
+<?php
+
+namespace System\Console\Create;
 
 use InvalidArgumentException;
 use System\Classes\Extensions\Plugins\PluginVersionManager;
+use System\Console\BaseScaffoldCommand;
 use Winter\Storm\Database\Model;
 use Winter\Storm\Support\Str;
 use Yaml;

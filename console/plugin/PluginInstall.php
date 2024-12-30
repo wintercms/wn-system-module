@@ -1,4 +1,6 @@
-<?php namespace System\Console;
+<?php
+
+namespace System\Console\Plugin;
 
 use System\Classes\Extensions\PluginManager;
 use System\Classes\UpdateManager;

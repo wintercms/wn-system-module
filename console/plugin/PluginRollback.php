@@ -1,10 +1,11 @@
-<?php namespace System\Console;
+<?php
+
+namespace System\Console\Plugin;
 
 use InvalidArgumentException;
 use System\Classes\Extensions\PluginManager;
+use System\Console\Traits;
 use Winter\Storm\Console\Command;
-use System\Classes\UpdateManager;
-use System\Classes\VersionManager;
 
 /**
  * Console command to rollback a plugin.
@@ -37,7 +38,7 @@ class PluginRollback extends Command
 
     /**
      * Execute the console command.
-     * @throws Exception if the UpdateManager is unable to rollback the requested plugin to the requested version
+     * @throws \Exception if the UpdateManager is unable to rollback the requested plugin to the requested version
      * @throws InvalidArgumentException if the requested rollback version can't be found
      */
     public function handle(): int

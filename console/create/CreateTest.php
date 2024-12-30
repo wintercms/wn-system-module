@@ -1,6 +1,6 @@
 <?php
 
-namespace System\Console;
+namespace System\Console\Create;
 
 use System\Console\BaseScaffoldCommand;
 use Winter\Storm\Support\Str;

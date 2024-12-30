@@ -1,7 +1,7 @@
-<?php namespace System\Console;
+<?php
 
-use Symfony\Component\Console\Helper\Table;
-use Symfony\Component\Console\Helper\TableSeparator;
+namespace System\Console\Plugin;
+
 use System\Classes\Extensions\PluginManager;
 use System\Models\PluginVersion;
 use Winter\Storm\Console\Command;

@@ -1,8 +1,10 @@
-<?php namespace System\Console;
+<?php
+
+namespace System\Console\Plugin;
 
 use System\Classes\Extensions\PluginManager;
+use System\Console\Traits;
 use Winter\Storm\Console\Command;
-use System\Classes\UpdateManager;
 
 /**
  * Console command to refresh a plugin.

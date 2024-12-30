@@ -1,4 +1,6 @@
-<?php namespace System\Console;
+<?php
+
+namespace System\Console\Create;
 
 use InvalidArgumentException;
 use System\Console\BaseScaffoldCommand;
