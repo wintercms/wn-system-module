@@ -3,9 +3,10 @@
 namespace System\Classes\Extensions;
 
 use Cms\Classes\Theme;
-use System\Classes\Core\InteractsWithZip;
 use Illuminate\Support\Facades\Storage;
+use System\Traits\InteractsWithZip;
 use Winter\Storm\Exception\ApplicationException;
+use Winter\Storm\Foundation\Extension\WinterExtension;
 use Winter\Storm\Support\Traits\Singleton;
 
 class Preserver
@@ -20,6 +21,9 @@ class Preserver
         Theme::class => 'themes',
     ];
 
+    /**
+     * @throws ApplicationException
+     */
     public function store(WinterExtension $extension): string
     {
         $this->ensureDirectory(static::ROOT_PATH);
@@ -34,15 +38,15 @@ class Preserver
             '%s%4$s%s%4$s%s',
             static::ROOT_PATH,
             $type,
-            $extension->extensionIdentifier(),
+            $extension->getIdentifier(),
             DIRECTORY_SEPARATOR
         );
 
         $this->ensureDirectory($extensionArchiveDir);
 
         return $this->packArchive(
-            $extension->extensionPath(),
-            Storage::path($extensionArchiveDir . DIRECTORY_SEPARATOR . $extension->extensionVersion())
+            $extension->getPath(),
+            Storage::path($extensionArchiveDir . DIRECTORY_SEPARATOR . $extension->getVersion())
         );
     }
 

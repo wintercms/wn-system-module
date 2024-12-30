@@ -7,7 +7,7 @@ use ReflectionClass;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use System\Classes\Extensions\PluginManager;
-use System\Classes\Extensions\Plugins\PluginVersionManager;
+use System\Classes\Extensions\PluginVersionManager;
 use System\Classes\UpdateManager;
 use Winter\Storm\Database\Model as ActiveRecord;
 

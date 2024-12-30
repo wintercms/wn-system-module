@@ -1,18 +1,16 @@
 <?php
 
-namespace System\Classes\Extensions\Plugins;
+namespace System\Classes\Extensions;
 
 use Carbon\Carbon;
 use Illuminate\Console\View\Components\Error;
 use Illuminate\Console\View\Components\Task;
 use Illuminate\Support\Facades\File;
-use System\Classes\Extensions\PluginBase;
-use System\Classes\Extensions\PluginManager;
+use stdClass;
 use System\Classes\VersionYamlProcessor;
 use Winter\Storm\Database\Updater;
 use Winter\Storm\Support\Facades\DB;
 use Winter\Storm\Support\Facades\Yaml;
-use stdClass;
 
 /**
  * Version manager

@@ -1,6 +1,6 @@
 <?php
 
-namespace System\Classes\Core;
+namespace System\Traits;
 
 use Illuminate\Support\Facades\Lang;
 use Winter\Storm\Exception\ApplicationException;

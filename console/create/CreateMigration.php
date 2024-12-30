@@ -3,7 +3,7 @@
 namespace System\Console\Create;
 
 use InvalidArgumentException;
-use System\Classes\Extensions\Plugins\PluginVersionManager;
+use System\Classes\Extensions\PluginVersionManager;
 use System\Console\BaseScaffoldCommand;
 use Winter\Storm\Database\Model;
 use Winter\Storm\Support\Str;

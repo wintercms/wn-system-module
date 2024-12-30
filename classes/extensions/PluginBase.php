@@ -7,7 +7,6 @@ use Composer\Semver\Semver;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\ServiceProvider as ServiceProviderBase;
 use ReflectionClass;
-use System\Classes\Extensions\Plugins\PluginVersionManager;
 use System\Classes\VersionYamlProcessor;
 use Winter\Storm\Exception\SystemException;
 use Winter\Storm\Foundation\Application;
