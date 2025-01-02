@@ -4,6 +4,7 @@ namespace System\Classes\Extensions;
 
 use Carbon\Carbon;
 use Illuminate\Console\View\Components\Error;
+use Illuminate\Console\View\Components\Info;
 use Illuminate\Console\View\Components\Task;
 use Illuminate\Support\Facades\File;
 use stdClass;
@@ -76,13 +77,13 @@ class PluginVersionManager
 
         // No updates needed
         if ($currentVersion === (string) $databaseVersion) {
-            $this->pluginManager->getOutput()->info('Nothing to migrate.');
+            $this->pluginManager->renderComponent(Info::class, 'Nothing to migrate.');
             return null;
         }
 
         $newUpdates = $this->getNewFileVersions($code, $databaseVersion);
 
-        $this->pluginManager->getOutput()->info('Running migrations.');
+        $this->pluginManager->renderComponent(Info::class, 'Running migrations.');
 
         foreach ($newUpdates as $version => $details) {
             $this->applyPluginUpdate($code, $version, $details);
@@ -91,6 +92,9 @@ class PluginVersionManager
                 return true;
             }
         }
+
+        // @TODO: do better
+        $this->pluginManager->getOutput()->writeln('');
 
         return true;
     }
@@ -200,9 +204,6 @@ class PluginVersionManager
             ),
             $updateFn
         );
-
-        // @TODO: do better
-        $this->pluginManager->getOutput()->writeln('');
     }
 
     /**

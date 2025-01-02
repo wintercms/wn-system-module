@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Lang;
 use System\Models\Parameter;
+use System\Traits\InteractsWithZip;
 use Winter\Storm\Exception\ApplicationException;
 use Winter\Storm\Network\Http as NetworkHttp;
 use Winter\Storm\Support\Facades\Config;
@@ -23,6 +24,7 @@ class MarketPlaceApi
 {
     use Singleton;
     use UpdateManagerFileSystemTrait;
+    use InteractsWithZip;
 
     public const PRODUCT_CACHE_KEY = 'system-updates-product-details';
 
@@ -374,5 +376,52 @@ class MarketPlaceApi
 
         $http->noRedirect();
         $http->data($postData);
+    }
+
+    /**
+     * Downloads a theme from the update server.
+     */
+    public function downloadTheme(string $name, string $hash): static
+    {
+        $fileCode = $name . $hash;
+        $this->fetchFile('theme/get', $fileCode, $hash, ['name' => $name]);
+        return $this;
+    }
+
+    /**
+     * Extracts a theme after it has been downloaded.
+     * @throws ApplicationException
+     */
+    public function extractTheme(string $name, string $hash): void
+    {
+        $fileCode = $name . $hash;
+        $filePath = $this->getFilePath($fileCode);
+
+        $this->extractArchive($filePath, themes_path());
+    }
+
+    /**
+     * Downloads a plugin from the update server.
+     * @param bool $installation Indicates whether this is a plugin installation request.
+     */
+    public function downloadPlugin(string $name, string $hash, bool $installation = false): static
+    {
+        $fileCode = $name . $hash;
+        $this->fetchFile('plugin/get', $fileCode, $hash, [
+            'name'         => $name,
+            'installation' => $installation ? 1 : 0
+        ]);
+        return $this;
+    }
+
+    /**
+     * Extracts a plugin after it has been downloaded.
+     */
+    public function extractPlugin(string $name, string $hash): void
+    {
+        $fileCode = $name . $hash;
+        $filePath = $this->getFilePath($fileCode);
+
+        $this->extractArchive($filePath, plugins_path());
     }
 }

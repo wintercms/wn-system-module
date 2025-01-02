@@ -29,7 +29,6 @@ class UpdateManager
     use \Winter\Storm\Support\Traits\Singleton;
     use \System\Classes\Core\UpdateManagerFileSystemTrait;
     use \System\Classes\Core\UpdateManagerCoreManagerTrait;
-    use \System\Classes\Core\UpdateManagerModuleManagerTrait;
     use \System\Classes\Core\UpdateManagerPluginInstallerTrait;
     use \System\Classes\Core\UpdateManagerThemeInstallerTrait;
 

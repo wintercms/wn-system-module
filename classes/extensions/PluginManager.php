@@ -4,6 +4,7 @@ namespace System\Classes\Extensions;
 
 use Backend\Classes\NavigationManager;
 use FilesystemIterator;
+use Illuminate\Console\View\Components\Error;
 use Illuminate\Console\View\Components\Info;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Artisan;
@@ -179,9 +180,6 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
             throw new ApplicationException('Unable to update plugin: ' . $code);
         }
 
-        // Force a refresh of the plugin
-        $this->refresh($code);
-
         // Return an instance of the plugin
         return $this->findByIdentifier($code);
     }
@@ -285,7 +283,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
 
         // Update the plugin database and version
         if (!($plugin = $this->findByIdentifier($code))) {
-            $this->output->info(sprintf('Unable to find plugin %s', $code));
+            $this->renderComponent(Error::class, sprintf('Unable to find plugin %s', $code));
             return null;
         }
 
@@ -297,7 +295,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
                 && ($composerPackage = $plugin->getComposerPackageName())
                 && Composer::updateAvailable($composerPackage)
             ) {
-                $this->output->info(sprintf(
+                $this->renderComponent(Info::class, sprintf(
                     'Performing composer update for %s (%s) plugin...',
                     $pluginName,
                     $code
@@ -306,23 +304,52 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
                 Preserver::instance()->store($plugin);
                 $update = Composer::update(dryRun: true, package: $composerPackage);
 
-                $versions = $update->getUpgraded()[$composerPackage] ?? null;
+                ($versions = $update->getUpgraded()[$composerPackage] ?? null)
+                    ? $this->renderComponent(
+                        Info::class,
+                        sprintf('Updated plugin %s (%s) from v%s => v%s', $pluginName, $code, $versions[0], $versions[1])
+                    )
+                    : $this->renderComponent(
+                        Error::class,
+                        sprintf('Failed to update plugin %s (%s)', $pluginName, $code)
+                    );
 
-                $this->output->{$versions ? 'info' : 'error'}(
-                    $versions
-                        ? sprintf('Updated plugin %s (%s) from v%s => v%s', $pluginName, $code, $versions[0], $versions[1])
-                        : sprintf('Failed to update plugin %s (%s)', $pluginName, $code)
-                );
             } elseif (false /* Detect if market */) {
                 Preserver::instance()->store($plugin);
                 // @TODO: Update files from market
             }
         }
 
-        $this->output->info(sprintf('Migrating %s (%s) plugin...', $pluginName, $code));
+        $this->renderComponent(Info::class, sprintf('Migrating %s (%s) plugin...', $pluginName, $code));
         $this->versionManager->updatePlugin($plugin);
 
+        // Ensure any active aliases have their history migrated for replacing plugins
+        $this->migratePluginReplacements();
+
         return true;
+    }
+
+    public function migratePluginReplacements(): array
+    {
+        $plugins = $this->list();
+
+        /*
+        * Replace plugins
+        */
+        foreach ($plugins as $code => $plugin) {
+            if (!($replaces = $plugin->getReplaces())) {
+                continue;
+            }
+            // TODO: add full support for plugins replacing multiple plugins
+            if (count($replaces) > 1) {
+                throw new ApplicationException(Lang::get('system::lang.plugins.replace.multi_install_error'));
+            }
+            foreach ($replaces as $replace) {
+                $this->versionManager()->replacePlugin($plugin, $replace);
+            }
+        }
+
+        return $plugins;
     }
 
     public function availableUpdates(WinterExtension|string|null $extension = null): ?array
@@ -381,7 +408,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
             !($plugin = $this->findByIdentifier($code))
             && $this->versionManager->purgePlugin($code)
         ) {
-            $this->output->info(sprintf('%s purged from database', $code));
+            $this->renderComponent(Info::class, sprintf('%s purged from database', $code));
             return $plugin;
         }
 
@@ -390,10 +417,10 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         }
 
         if ($this->versionManager->removePlugin($plugin, $targetVersion, true)) {
-            $this->output->info(sprintf('%s rolled back', $code));
+            $this->renderComponent(Info::class, sprintf('%s rolled back', $code));
 
             if ($currentVersion = $this->versionManager->getCurrentVersion($plugin)) {
-                $this->output->info(sprintf(
+                $this->renderComponent(Info::class, sprintf(
                     'Current Version: %s (%s)',
                     $currentVersion,
                     $this->versionManager->getCurrentVersionNote($plugin)
@@ -403,7 +430,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
             return $plugin;
         }
 
-        $this->output->error(sprintf('Unable to find plugin %s', $code));
+        $this->renderComponent(Error::class, sprintf('Unable to find plugin %s', $code));
 
         return null;
     }
@@ -434,7 +461,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
             $this->clearFlagCache();
         }
 
-        $this->output->info('Deleted plugin: ' . $code);
+        $this->renderComponent(Info::class, 'Deleted plugin: <fg=red>' . $code . '</>');
 
         return true;
     }
@@ -1210,6 +1237,23 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         }
 
         return $warnings;
+    }
+
+    /**
+     * Get a list of plugin replacement notices.
+     */
+    public function getPluginReplacementNotices(): array
+    {
+        $notices = [];
+        foreach ($this->getReplacementMap() as $alias => $plugin) {
+            if ($this->getActiveReplacementMap($alias)) {
+                $notices[$plugin] = Lang::get('system::lang.updates.update_warnings_plugin_replace_cli', [
+                    'alias' => '<info>' . $alias . '</info>'
+                ]);
+            }
+        }
+
+        return $notices;
     }
 
     /**

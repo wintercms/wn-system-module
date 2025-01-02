@@ -3,8 +3,11 @@
 namespace System\Classes\Extensions\Source;
 
 use Cms\Classes\ThemeManager;
+use Illuminate\Console\View\Components\Error;
+use Illuminate\Console\View\Components\Info;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\File;
+use System\Classes\Core\MarketPlaceApi;
 use System\Classes\Extensions\ExtensionManager;
 use System\Classes\Extensions\ExtensionManagerInterface;
 use System\Classes\Extensions\ModuleManager;
@@ -101,7 +104,7 @@ class ExtensionSource
     /**
      * @throws ApplicationException
      */
-    public function createFiles(): static
+    public function createFiles(): ?static
     {
         switch ($this->source) {
             case static::SOURCE_COMPOSER:
@@ -116,7 +119,45 @@ class ExtensionSource
                 $this->source = static::SOURCE_LOCAL;
                 break;
             case static::SOURCE_MARKET:
-                throw new ApplicationException('need to implement market support');
+                if (!in_array($this->type, [static::TYPE_PLUGIN, static::TYPE_THEME])) {
+                    throw new ApplicationException("The market place only supports themes and plugins '{$this->type}'");
+                }
+
+                $manager = match ($this->type) {
+                    static::TYPE_THEME => ThemeManager::instance(),
+                    static::TYPE_PLUGIN => PluginManager::instance(),
+                };
+
+                $manager->renderComponent(Info::class, 'Downloading ' . $this->type . ' details...');
+
+                try {
+                    $extensionDetails = MarketPlaceApi::instance()->request(match ($this->type) {
+                        static::TYPE_THEME => MarketPlaceApi::REQUEST_THEME_DETAIL,
+                        static::TYPE_PLUGIN => MarketPlaceApi::REQUEST_PLUGIN_DETAIL,
+                    }, $this->code);
+                } catch (\Throwable $e) {
+                    $manager->renderComponent(
+                        Error::class,
+                        'Unable to download ' . $this->type . ' details: <fg=yellow>' . $e->getMessage() . '</>'
+                    );
+                    return null;
+                }
+
+                $manager->renderComponent(Info::class, 'Downloading ' . $this->type . '...');
+                MarketPlaceApi::instance()->{'download' . ucfirst($this->type)}(
+                    $extensionDetails['code'],
+                    $extensionDetails['hash']
+                );
+
+                $manager->renderComponent(Info::class, 'Extracting ' . $this->type . '...');
+                MarketPlaceApi::instance()->{'extract' . ucfirst($this->type)}(
+                    $extensionDetails['code'],
+                    $extensionDetails['hash']
+                );
+
+                $this->path = $this->guessPathFromCode($this->code);
+                $this->source = static::SOURCE_LOCAL;
+
                 break;
             case static::SOURCE_LOCAL:
                 break;
@@ -132,10 +173,10 @@ class ExtensionSource
     /**
      * @throws ApplicationException
      */
-    public function install(): WinterExtension
+    public function install(): ?WinterExtension
     {
-        if ($this->status === static::STATUS_UNINSTALLED) {
-            $this->createFiles();
+        if ($this->status === static::STATUS_UNINSTALLED && !$this->createFiles()) {
+            return null;
         }
 
         if ($this->status === static::STATUS_INSTALLED) {

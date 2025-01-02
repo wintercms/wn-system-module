@@ -10,46 +10,10 @@ use Winter\Storm\Exception\ApplicationException;
 
 trait UpdateManagerPluginInstallerTrait
 {
-    public function mapPluginReplacements(): array
-    {
-        $plugins = $this->pluginManager->getPlugins();
-
-        /*
-        * Replace plugins
-        */
-        foreach ($plugins as $code => $plugin) {
-            if (!$replaces = $plugin->getReplaces()) {
-                continue;
-            }
-            // TODO: add full support for plugins replacing multiple plugins
-            if (count($replaces) > 1) {
-                throw new ApplicationException(Lang::get('system::lang.plugins.replace.multi_install_error'));
-            }
-            foreach ($replaces as $replace) {
-                $this->pluginManager->versionManager()->replacePlugin($plugin, $replace);
-            }
-        }
-
-        return $plugins;
-    }
-
     public function updatePlugins(array $plugins): static
     {
         foreach ($plugins as $code => $plugin) {
             $this->updatePlugin($code);
-        }
-
-        return $this;
-    }
-
-    public function generatePluginReplacementNotices(): static
-    {
-        foreach ($this->pluginManager->getReplacementMap() as $alias => $plugin) {
-            if ($this->pluginManager->getActiveReplacementMap($alias)) {
-                $this->message($plugin, Lang::get('system::lang.updates.update_warnings_plugin_replace_cli', [
-                    'alias' => '<info>' . $alias . '</info>'
-                ]));
-            }
         }
 
         return $this;
@@ -135,28 +99,5 @@ trait UpdateManagerPluginInstallerTrait
     }
 
 
-    /**
-     * Downloads a plugin from the update server.
-     * @param bool $installation Indicates whether this is a plugin installation request.
-     */
-    public function downloadPlugin(string $name, string $hash, bool $installation = false): static
-    {
-        $fileCode = $name . $hash;
-        $this->api->fetchFile('plugin/get', $fileCode, $hash, [
-            'name'         => $name,
-            'installation' => $installation ? 1 : 0
-        ]);
-        return $this;
-    }
 
-    /**
-     * Extracts a plugin after it has been downloaded.
-     */
-    public function extractPlugin(string $name, string $hash): void
-    {
-        $fileCode = $name . $hash;
-        $filePath = $this->getFilePath($fileCode);
-
-        $this->extractArchive($filePath, plugins_path());
-    }
 }
