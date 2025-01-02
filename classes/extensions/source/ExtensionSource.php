@@ -250,11 +250,76 @@ class ExtensionSource
     protected function guessCodeFromPath(string $path): ?string
     {
         return match ($this->type) {
-            static::TYPE_PLUGIN => str_replace('/', '.', ltrim(Str::after($path, basename(plugins_path())), '/')),
+            static::TYPE_PLUGIN => str_replace('/', '.', ltrim(
+                str_starts_with($path, plugins_path())
+                    ? Str::after($path, basename(plugins_path()))
+                    : $this->guessCodeFromPlugin($path),
+            '/')),
             static::TYPE_THEME => Str::after($path, themes_path()),
             static::TYPE_MODULE => Str::after($path, base_path('modules/')),
             default => null,
         };
+    }
+
+    /**
+     * @throws \ReflectionException
+     * @throws ApplicationException
+     */
+    protected function guessCodeFromPlugin(string $path): string
+    {
+        // Get all files in the provided path
+        $files = array_combine(array_map('strtolower', $files = scandir($path)), $files);
+
+        // If there is no plugin.php in any casing, then throw
+        if (!isset($files['plugin.php'])) {
+            throw new ApplicationException(sprintf('Unable to locate plugin file in path: "%s"', $path));
+        }
+
+        // Create a full path to the plugin.php file
+        $file = $path . DIRECTORY_SEPARATOR . $files['plugin.php'];
+
+        // The following will create a child process to parse the plugins namespace, this is done to prevent pollution
+        // of the current process (i.e. namespaces being incorrectly registered to paths where they won't be in the
+        // future post installation)
+
+        // Create a named pipe
+        $pipeName = 'classTestPipe';
+        posix_mkfifo($pipeName, 0777);
+
+        // Fork the process
+        if (!pcntl_fork()) {
+            // Open the pipe now, so we can signal failure by closing it in case of a parse error
+            $pipe = fopen($pipeName, 'w');
+            try {
+                require $file;
+            } catch (\Throwable $e) {
+                // Probably a parse error, close the pipe to tell the parent that something went wrong
+                fclose($pipe);
+                exit(1);
+            }
+            // Get all declared classes
+            $classes = get_declared_classes();
+            // Reflect on the last registered class, i.e. the one we loaded with require above
+            $reflect = new \ReflectionClass(array_pop($classes));
+            // Send the namespace over the pipe to the parent process
+            fwrite($pipe, $reflect->getNamespaceName());
+            fclose($pipe);
+            exit(0);
+        }
+
+        // Read the pipe, this is blocking and will wait for the child to close the pipe handle in it's own process
+        $pipe = fopen($pipeName, 'r');
+        // Read the namespace from the pipe
+        $namespace = fread($pipe, 4096);
+        // Close and clean up
+        fclose($pipe);
+        unlink($pipeName);
+
+        if (!$namespace) {
+            throw new ApplicationException(sprintf('Unable to detect plugin namespace from `%s`. Is the file valid?', $file));
+        }
+
+        return PluginManager::instance()->getIdentifier($namespace);
     }
 
     protected function relativePath(string $path): string
