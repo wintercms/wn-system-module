@@ -160,6 +160,11 @@ class ExtensionSource
 
                 break;
             case static::SOURCE_LOCAL:
+                $extensionPath = $this->guessPathFromCode($this->code);
+                if ($this->path !== $extensionPath) {
+                    File::moveDirectory($this->path, $extensionPath);
+                    $this->path = $extensionPath;
+                }
                 break;
         }
 
@@ -223,8 +228,8 @@ class ExtensionSource
                 break;
             case static::SOURCE_MARKET:
             case static::SOURCE_LOCAL:
-                $path = $this->path ?? $this->guessPathFromCode($this->code);
-                if (!File::exists($path)) {
+                // Check the path the extension "should" be installed to
+                if (!File::exists($this->guessPathFromCode($this->code))) {
                     return static::STATUS_UNINSTALLED;
                 }
                 break;
@@ -247,6 +252,10 @@ class ExtensionSource
         };
     }
 
+    /**
+     * @throws \ReflectionException
+     * @throws ApplicationException
+     */
     protected function guessCodeFromPath(string $path): ?string
     {
         return match ($this->type) {
