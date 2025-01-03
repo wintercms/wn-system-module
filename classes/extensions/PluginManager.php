@@ -176,9 +176,11 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         $this->loadPlugins();
 
         // Get the plugin code from input and then update the plugin
-        if (!($code = $this->resolveIdentifier($extension)) || !$this->versionManager->updatePlugin($code)) {
+        if (!($code = $this->resolveIdentifier($extension)) || $this->versionManager->updatePlugin($code) === false) {
             throw new ApplicationException('Unable to update plugin: ' . $code);
         }
+
+        $this->renderComponent(Info::class, 'Plugin <fg=yellow>' . $code . '</> installed successfully.');
 
         // Return an instance of the plugin
         return $this->findByIdentifier($code);
