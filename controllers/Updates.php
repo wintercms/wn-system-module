@@ -5,6 +5,8 @@ namespace System\Controllers;
 use Backend\Classes\Controller;
 use Backend\Facades\Backend;
 use Backend\Facades\BackendMenu;
+use Cms\Classes\Theme;
+use Cms\Classes\ThemeManager;
 use Exception;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response as HttpResponse;
@@ -220,17 +222,40 @@ class Updates extends Controller
     public function onCheckForUpdates(): array
     {
         try {
-            $manager = UpdateManager::instance();
-            $result = $manager->requestUpdateList();
+            $updates = UpdateManager::instance()->availableUpdates();
 
-            $result = $this->processUpdateLists($result);
-            $result = $this->processImportantUpdates($result);
+            $this->vars['core'] = $updates['modules'] ? [
+                'updates' => $updates['modules'],
+                'isImportant' => true
+            ] : false;
 
-            $this->vars['core'] = array_get($result, 'core', false);
-            $this->vars['hasUpdates'] = array_get($result, 'hasUpdates', false);
-            $this->vars['hasImportantUpdates'] = array_get($result, 'hasImportantUpdates', false);
-            $this->vars['pluginList'] = array_get($result, 'plugins', []);
-            $this->vars['themeList'] = array_get($result, 'themes', []);
+            $this->vars['pluginList'] = $updates['plugins']
+                ? array_reduce(array_keys($updates['plugins']), function (array $carry, string $code) use ($updates) {
+                    $carry[$code] = array_merge(PluginManager::instance()->get($code)->pluginDetails(), [
+                        'isImportant' => false,
+                        'old_version' => $updates['plugins'][$code]['from'],
+                        'new_version' => $updates['plugins'][$code]['to'],
+                    ]);
+                    return $carry;
+                }, [])
+                : false;
+
+            $this->vars['themeList'] = $updates['themes']
+                ? array_reduce(array_keys($updates['themes']), function (array $carry, string $code) use ($updates) {
+                    $theme = ThemeManager::instance()->get($code);
+                    $carry[$code] = [
+                        'name' => $theme['name'],
+                        'isImportant' => false,
+                        'old_version' => $updates['themes'][$code]['from'],
+                        'new_version' => $updates['themes'][$code]['to'],
+                    ];
+                    return $carry;
+                }, [])
+                : false;
+
+            $this->vars['hasImportantUpdates'] = !!count($updates['modules']);
+
+            $this->vars['hasUpdates'] = $this->vars['core'] || $this->vars['pluginList'] || $this->vars['themeList'];
         }
         catch (Exception $ex) {
             $this->handleError($ex);
@@ -540,7 +565,7 @@ class Updates extends Controller
     public function onLoadChangelog(): string
     {
         try {
-            $fetchedContent = UpdateManager::instance()->requestChangelog();
+            $fetchedContent = MarketPlaceApi::instance()->requestChangelog();
 
             $changelog = array_get($fetchedContent, 'history');
 

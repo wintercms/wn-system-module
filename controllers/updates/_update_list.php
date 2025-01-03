@@ -30,30 +30,10 @@
                                 </h5>
                             </div>
                             <dl>
-                                <?php foreach (array_get($core, 'updates', []) as $build => $description): ?>
-                                    <dt><?= e(trans('system::lang.updates.core_build', ['build'=>$build])) ?></dt>
-                                    <?php if (is_array($description)): ?>
-                                        <dd>
-                                            <span class="important-update-label">
-                                                <?= e(trans('system::lang.updates.important_action_required')) ?>
-                                            </span>
-                                            <?= e($description[0]) ?>
-                                            <a href="<?= $description[1] ?>" target="_blank">
-                                                <?= e(trans('system::lang.updates.important_view_release_notes')) ?>
-                                                <i class="icon-external-link"></i>
-                                            </a>
-                                        </dd>
-                                    <?php else: ?>
-                                        <dd><?= e($description) ?></dd>
-                                    <?php endif ?>
+                                <?php foreach (array_get($core, 'updates', []) as $module => $versions): ?>
+                                    <dt><?= e(trans('system::lang.updates.core_build', ['build' => $module])) ?></dt>
                                 <?php endforeach ?>
-                                <?php if ($core['old_build']): ?>
-                                    <dt class="text-muted"><?= e(trans('system::lang.updates.core_build', ['build'=>$core['old_build']])) ?></dt>
-                                    <dd class="text-muted"><?= e(trans('system::lang.updates.core_current_build')) ?></dd>
-                                <?php endif ?>
                             </dl>
-                            <input type="hidden" name="hash" value="<?= e($core['hash']) ?>" />
-                            <input type="hidden" name="build" value="<?= e($core['build']) ?>" />
                         </div>
                     <?php endif ?>
 
@@ -66,11 +46,11 @@
                                 </h5>
                             </div>
                             <dl>
-                                <dt><?= e(array_get($theme, 'version', 'v1.0.0')) ?></dt>
+                                <dt><?= e(array_get($theme, 'old_version', 'v1.0.0')) ?></dt>
                                 <dd><?= e(trans('system::lang.updates.theme_new_install')) ?></dd>
                             </dl>
 
-                            <input type="hidden" name="themes[<?= e($this->encodeCode($code)) ?>]" value="<?= e($theme['hash']) ?>" />
+                            <input type="hidden" name="themes[<?= e($this->encodeCode($code)) ?>]" value="<?= e($theme['new_version']) ?>" />
                         </div>
                     <?php endforeach ?>
 
@@ -131,7 +111,7 @@
                                 <?php endif ?>
                             </dl>
 
-                            <input type="hidden" name="plugins[<?= e($this->encodeCode($code)) ?>]" value="<?= e($plugin['hash']) ?>" />
+                            <input type="hidden" name="plugins[<?= e($this->encodeCode($code)) ?>]" value="<?= e($plugin['new_version']) ?>" />
                         </div>
                     <?php endforeach ?>
 
