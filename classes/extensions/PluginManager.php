@@ -17,8 +17,11 @@ use InvalidArgumentException;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use System\Classes\ComposerManager;
+use System\Classes\Core\MarketPlaceApi;
 use System\Classes\Extensions\Source\ExtensionSource;
 use System\Classes\SettingsManager;
+use System\Classes\UpdateManager;
+use System\Models\Parameter;
 use System\Models\PluginVersion;
 use Winter\Storm\Exception\ApplicationException;
 use Winter\Storm\Exception\SystemException;
@@ -38,8 +41,6 @@ use Winter\Storm\Support\Str;
  */
 class PluginManager extends ExtensionManager implements ExtensionManagerInterface
 {
-    public const EXTENSION_NAME = 'plugin';
-
     /**
      * The application instance, since Plugins are an extension of a Service Provider
      */
@@ -279,70 +280,80 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
      */
     public function update(WinterExtension|string|null $extension = null, bool $migrationsOnly = false): ?bool
     {
-        if (!($code = $this->resolveIdentifier($extension))) {
-            return null;
+        $plugins = [];
+        // If null, load all plugins
+        if (!$extension) {
+            $plugins = $this->list();
         }
 
-        // Update the plugin database and version
-        if (!($plugin = $this->findByIdentifier($code))) {
-            $this->renderComponent(Error::class, sprintf('Unable to find plugin %s', $code));
-            return null;
+        if (!$plugins) {
+            if (!($resolved = $this->resolve($extension))) {
+                throw new ApplicationException(
+                    'Unable to resolve plugin: ' . is_string($extension) ? $extension : $extension->getIdentifier()
+                );
+            }
+            $plugins = [$resolved->getIdentifier() => $resolved];
         }
 
-        $pluginName = Lang::get($plugin->pluginDetails()['name']);
+        foreach ($plugins as $code => $plugin) {
+            $pluginName = Lang::get($plugin->pluginDetails()['name']);
+            if (!$migrationsOnly) {
+                if (
+                    !$this->getPluginRecord($plugin)->is_frozen
+                    && ($composerPackage = $plugin->getComposerPackageName())
+                    && Composer::updateAvailable($composerPackage)
+                ) {
+                    $this->renderComponent(Info::class, sprintf(
+                        'Performing composer update for %s (%s) plugin...',
+                        $pluginName,
+                        $code
+                    ));
 
-        if (!$migrationsOnly) {
-            if (
-                !$this->getPluginRecord($plugin)->is_frozen
-                && ($composerPackage = $plugin->getComposerPackageName())
-                && Composer::updateAvailable($composerPackage)
-            ) {
-                $this->renderComponent(Info::class, sprintf(
-                    'Performing composer update for %s (%s) plugin...',
-                    $pluginName,
-                    $code
-                ));
+                    Preserver::instance()->store($plugin);
+                    // @TODO: Make this not dry run
+                    $update = Composer::update(dryRun: true, package: $composerPackage);
 
-                Preserver::instance()->store($plugin);
-                $update = Composer::update(dryRun: true, package: $composerPackage);
-
-                ($versions = $update->getUpgraded()[$composerPackage] ?? null)
-                    ? $this->renderComponent(
-                        Info::class,
-                        sprintf('Updated plugin %s (%s) from v%s => v%s', $pluginName, $code, $versions[0], $versions[1])
-                    )
-                    : $this->renderComponent(
-                        Error::class,
-                        sprintf('Failed to update plugin %s (%s)', $pluginName, $code)
+                    ($versions = $update->getUpgraded()[$composerPackage] ?? null)
+                        ? $this->renderComponent(Info::class, sprintf(
+                            'Updated plugin %s (%s) from v%s => v%s',
+                            $pluginName,
+                            $code,
+                            $versions[0],
+                            $versions[1]
+                        ))
+                        : $this->renderComponent(Error::class, sprintf(
+                            'Failed to update plugin %s (%s)',
+                            $pluginName,
+                            $code
+                        )
                     );
 
-            } elseif (false /* Detect if market */) {
-                Preserver::instance()->store($plugin);
-                // @TODO: Update files from market
+                } elseif (false /* Detect if market */) {
+                    Preserver::instance()->store($plugin);
+                    // @TODO: Update files from market
+                }
             }
+
+            $this->renderComponent(Info::class, sprintf('Migrating %s (%s) plugin...', $pluginName, $code));
+            $this->versionManager->updatePlugin($plugin);
+
+            // Ensure any active aliases have their history migrated for replacing plugins
+            $this->migratePluginReplacements();
         }
-
-        $this->renderComponent(Info::class, sprintf('Migrating %s (%s) plugin...', $pluginName, $code));
-        $this->versionManager->updatePlugin($plugin);
-
-        // Ensure any active aliases have their history migrated for replacing plugins
-        $this->migratePluginReplacements();
 
         return true;
     }
 
-    public function migratePluginReplacements(): array
+    /*
+     * Replace plugins
+     */
+    public function migratePluginReplacements(): static
     {
-        $plugins = $this->list();
-
-        /*
-        * Replace plugins
-        */
-        foreach ($plugins as $code => $plugin) {
+        foreach ($this->list() as $code => $plugin) {
             if (!($replaces = $plugin->getReplaces())) {
                 continue;
             }
-            // TODO: add full support for plugins replacing multiple plugins
+            // @TODO: add full support for plugins replacing multiple plugins
             if (count($replaces) > 1) {
                 throw new ApplicationException(Lang::get('system::lang.plugins.replace.multi_install_error'));
             }
@@ -351,7 +362,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
             }
         }
 
-        return $plugins;
+        return $this;
     }
 
     public function availableUpdates(WinterExtension|string|null $extension = null): ?array
@@ -364,16 +375,14 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         foreach ($toCheck as $plugin) {
             if ($plugin->getComposerPackageName()) {
                 if (isset($composerUpdates[$plugin->getComposerPackageName()])) {
-                    $updates[] = [
-                        'name' => $plugin->getPluginIdentifier(),
+                    $updates[$plugin->getPluginIdentifier()] = [
                         'from' => $composerUpdates[$plugin->getComposerPackageName()][0],
                         'to' => $composerUpdates[$plugin->getComposerPackageName()][1],
                     ];
                 }
                 continue;
             }
-
-            // @TODO: Check api
+            // @TODO: Add market place support for updates
         }
 
         return $updates;
@@ -441,7 +450,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
      * Completely roll back and delete a plugin from the system.
      * @throws ApplicationException
      */
-    public function uninstall(WinterExtension|string|null $extension = null, bool $noRollback = false): ?bool
+    public function uninstall(WinterExtension|string $extension, bool $noRollback = false, bool $preserveFiles = false): ?bool
     {
         if (!($code = $this->resolveIdentifier($extension))) {
             return null;
@@ -454,7 +463,9 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
 
         // Delete from file system
         if ($pluginPath = self::instance()->getPluginPath($code)) {
-            File::deleteDirectory($pluginPath);
+            if (!$preserveFiles) {
+                File::deleteDirectory($pluginPath);
+            }
 
             // Clear the registration values cache
             $this->registrationMethodCache = [];
@@ -468,10 +479,14 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         return true;
     }
 
+    /**
+     * Uninstall all plugins
+     * @throws ApplicationException
+     */
     public function tearDown(): static
     {
-        foreach ($this->getAllPlugins() as $plugin) {
-            $this->uninstall($plugin);
+        foreach (array_reverse($this->getAllPlugins()) as $plugin) {
+            $this->uninstall($plugin, preserveFiles: true);
         }
 
         return $this;
@@ -1416,6 +1431,24 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
         }
 
         return null;
+    }
+
+    /**
+     * @param WinterExtension|string|null $extension
+     * @return array<string, WinterExtension>
+     * @throws ApplicationException
+     */
+    protected function getPluginList(WinterExtension|string|null $extension = null): array
+    {
+        if (!$extension) {
+            return $this->list();
+        }
+
+        if (!($resolved = $this->resolve($extension))) {
+            throw new ApplicationException('Unable to locate extension');
+        }
+
+        return [$resolved->getIdentifier() => $resolved];
     }
 
     /**

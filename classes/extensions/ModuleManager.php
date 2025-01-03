@@ -6,6 +6,7 @@ use Illuminate\Console\OutputStyle;
 use Illuminate\Database\Migrations\DatabaseMigrationRepository;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\File;
 use System\Classes\Extensions\Source\ExtensionSource;
 use System\Classes\UpdateManager;
 use System\Helpers\Cache as CacheHelper;
@@ -181,19 +182,36 @@ class ModuleManager extends ExtensionManager implements ExtensionManagerInterfac
         return true;
     }
 
-    public function uninstall(WinterExtension|string|null $extension = null): mixed
+    public function uninstall(WinterExtension|string $extension, bool $noRollback = false, bool $preserveFiles = false): mixed
     {
-        $modules = $this->getModuleList($extension);
-        foreach ($modules as $module) {
+        if (!($module = $this->resolve($extension))) {
+            throw new ApplicationException(sprintf(
+                'Unable to uninstall module: %s',
+                is_string($extension) ? $extension : $extension->getIdentifier()
+            ));
+        }
+
+        if (!$noRollback) {
             $this->rollback($module);
         }
 
-        // System uninstall
-        if (!$extension) {
-            Schema::dropIfExists(UpdateManager::instance()->getMigrationTableName());
+        if (!$preserveFiles) {
+            // Modules probably should not be removed
+            // File::deleteDirectory($module->getPath());
         }
 
         return true;
+    }
+
+    public function tearDown(): static
+    {
+        foreach ($this->list() as $module) {
+            $this->uninstall($module);
+        }
+
+        Schema::dropIfExists(UpdateManager::instance()->getMigrationTableName());
+
+        return $this;
     }
 
     public function isInstalled(WinterExtension|ExtensionSource|string $extension): bool
@@ -226,20 +244,20 @@ class ModuleManager extends ExtensionManager implements ExtensionManagerInterfac
 
     public function availableUpdates(WinterExtension|string|null $extension = null): ?array
     {
-        $updates = [];
-        $composerUpdates = null;
-        foreach ($this->list() as $name => $module) {
-            if ($composerPackage = $module->getComposerPackageName()) {
-                if (!$composerUpdates) {
-                    $composerUpdates = Composer::getAvailableUpdates();
-                }
+        $toCheck = $extension ? [$this->get($extension)] : $this->list();
 
-                if (isset($composerUpdates[$composerPackage])) {
-                    $updates[$name] = $composerUpdates[$composerPackage];
-                }
-            } else {
-                // @TODO: api check
+        $composerUpdates = Composer::getAvailableUpdates();
+
+        $updates = [];
+        foreach ($toCheck as $module) {
+            if (!$module->getComposerPackageName() || !isset($composerUpdates[$module->getComposerPackageName()])) {
+                continue;
             }
+
+            $updates[$module->getIdentifier()] = [
+                'from' => $composerUpdates[$module->getComposerPackageName()][0],
+                'to' => $composerUpdates[$module->getComposerPackageName()][1],
+            ];
         }
 
         return $updates;

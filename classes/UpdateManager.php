@@ -8,11 +8,14 @@ use Exception;
 use Illuminate\Database\Migrations\DatabaseMigrationRepository;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Support\Facades\App;
+use Mix\TestA\Plugin;
 use System\Classes\Core\MarketPlaceApi;
+use System\Classes\Extensions\ModuleManager;
 use System\Classes\Extensions\PluginManager;
 use System\Helpers\Cache as CacheHelper;
 use System\Models\Parameter;
 use Winter\Storm\Exception\ApplicationException;
+use Winter\Storm\Exception\SystemException;
 use Winter\Storm\Support\Facades\Config;
 use Winter\Storm\Support\Facades\Schema;
 
@@ -27,16 +30,6 @@ use Winter\Storm\Support\Facades\Schema;
 class UpdateManager
 {
     use \Winter\Storm\Support\Traits\Singleton;
-    use \System\Classes\Core\UpdateManagerFileSystemTrait;
-    use \System\Classes\Core\UpdateManagerCoreManagerTrait;
-    use \System\Classes\Core\UpdateManagerPluginInstallerTrait;
-    use \System\Classes\Core\UpdateManagerThemeInstallerTrait;
-
-    protected PluginManager $pluginManager;
-    protected ThemeManager $themeManager;
-    protected MarketPlaceApi $api;
-    protected Migrator $migrator;
-    protected DatabaseMigrationRepository $repository;
 
     /**
      * If set to true, core updates will not be downloaded or extracted.
@@ -44,45 +37,11 @@ class UpdateManager
     protected bool $disableCoreUpdates = false;
 
     /**
-     * Array of messages returned by migrations / seeders. Returned at the end of the update process.
-     */
-    protected array $messages = [];
-
-    /**
      * Initialize this singleton.
      */
     protected function init()
     {
         $this->disableCoreUpdates = Config::get('cms.disableCoreUpdates', false);
-
-        $this->bindContainerObjects()
-            ->setTempDirectory(temp_path())
-            ->setBaseDirectory(base_path());
-    }
-
-    /**
-     * These objects are "soft singletons" and may be lost when
-     * the IoC container reboots. This provides a way to rebuild
-     * for the purposes of unit testing.
-     */
-    public function bindContainerObjects(bool $refresh = false): static
-    {
-        $this->api = isset($this->api) && !$refresh
-            ? $this->api
-            : MarketPlaceApi::instance();
-
-        $this->pluginManager = isset($this->pluginManager) && !$refresh
-            ? $this->pluginManager
-            : PluginManager::instance();
-
-        $this->themeManager = isset($this->themeManager) && !$refresh
-            ? $this->themeManager
-            : (class_exists(ThemeManager::class) ? ThemeManager::instance() : null);
-
-        $this->migrator = App::make('migrator');
-        $this->repository = App::make('migration.repository');
-
-        return $this;
     }
 
     public function isSystemSetup(): bool
@@ -93,37 +52,6 @@ class UpdateManager
     public function getMigrationTableName(): string
     {
         return Config::get('database.migrations', 'migrations');
-    }
-
-    /**
-     * Creates the migration table and updates
-     * @throws ApplicationException
-     */
-    public function update(): static
-    {
-        $firstUp = $this->isSystemSetup();
-
-        $modules = Config::get('cms.loadModules', []);
-
-        if ($firstUp) {
-            $this->setupMigrations();
-        }
-
-        $this->migrateModules($modules);
-        $plugins = $this->mapPluginReplacements();
-
-        if ($firstUp) {
-            $this->seedModules($modules);
-        }
-
-        $this->updatePlugins($plugins);
-
-        Parameter::set('system::update.count', 0);
-        CacheHelper::clear();
-
-        $this->generatePluginReplacementNotices();
-
-        return $this;
     }
 
     /**
@@ -163,38 +91,37 @@ class UpdateManager
         return $newCount;
     }
 
+    public function availableUpdates(): array
+    {
+        return [
+            'modules' => ModuleManager::instance()->availableUpdates(),
+            'plugins' => PluginManager::instance()->availableUpdates(),
+            'themes' => ThemeManager::instance()->availableUpdates(),
+        ];
+    }
+
+    /**
+     * @throws ApplicationException
+     * @throws SystemException
+     */
+    public function update(): static
+    {
+        ModuleManager::instance()->update();
+        PluginManager::instance()->update();
+        ThemeManager::instance()->update();
+
+        return $this;
+    }
+
     /**
      * Roll back all modules and plugins.
+     * @throws ApplicationException
      */
     public function tearDownTheSystem(): static
     {
-        /*
-         * Rollback plugins
-         */
-        $plugins = array_reverse($this->pluginManager->getAllPlugins());
-        foreach ($plugins as $name => $plugin) {
-            $this->rollbackPlugin($name);
-        }
-
-        /*
-         * Register module migration files
-         */
-        $paths = [];
-        $modules = Config::get('cms.loadModules', []);
-
-        foreach ($modules as $module) {
-            $paths[] = base_path() . '/modules/' . strtolower($module) . '/database/migrations';
-        }
-
-        while (true) {
-            $rolledBack = $this->migrator->rollback($paths, ['pretend' => false]);
-
-            if (count($rolledBack) == 0) {
-                break;
-            }
-        }
-
-        Schema::dropIfExists($this->getMigrationTableName());
+        ThemeManager::instance()->tearDown();
+        PluginManager::instance()->tearDown();
+        ModuleManager::instance()->tearDown();
 
         return $this;
     }
@@ -256,32 +183,5 @@ class UpdateManager
         }
 
         Parameter::set($params);
-    }
-
-    protected function message(string|object $class, string $format, mixed ...$args): static
-    {
-        $this->messages[] = [
-            'class' => is_object($class) ? get_class($class) : $class,
-            'message' => sprintf($format, ...$args),
-            'type' => 'info',
-        ];
-
-        return $this;
-    }
-
-    protected function error(string|object $class, string $format, mixed ...$args): static
-    {
-        $this->messages[] = [
-            'class' => is_object($class) ? get_class($class) : $class,
-            'message' => sprintf($format, ...$args),
-            'type' => 'error',
-        ];
-
-        return $this;
-    }
-
-    public function getMessages(): array
-    {
-        return $this->messages;
     }
 }

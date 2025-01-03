@@ -23,7 +23,6 @@ use Winter\Storm\Support\Traits\Singleton;
 class MarketPlaceApi
 {
     use Singleton;
-    use UpdateManagerFileSystemTrait;
     use InteractsWithZip;
 
     public const PRODUCT_CACHE_KEY = 'system-updates-product-details';
@@ -32,14 +31,6 @@ class MarketPlaceApi
     public const REQUEST_PLUGIN_CONTENT = 'plugin/content';
     public const REQUEST_THEME_DETAIL = 'theme/detail';
     public const REQUEST_PROJECT_DETAIL = 'project/detail';
-
-    /**
-     * Cache of gateway products
-     */
-    protected array $productCache = [
-        'theme' => [],
-        'plugin' => [],
-    ];
 
     /**
      * Secure API Key
@@ -51,13 +42,33 @@ class MarketPlaceApi
      */
     protected ?string $secret = null;
 
+    /**
+     * @var string Used during download of files
+     */
+    protected string $tempDirectory;
+
+    /**
+     * @var string Directs the UpdateManager where to unpack archives to
+     */
+    protected string $baseDirectory;
+
+    /**
+     * Cache of gateway products
+     */
+    protected array $productCache = [
+        'theme' => [],
+        'plugin' => [],
+    ];
+
+
     public function init()
     {
         if (Cache::has(static::PRODUCT_CACHE_KEY)) {
             $this->productCache = Cache::get(static::PRODUCT_CACHE_KEY);
         }
 
-        $this->setTempDirectory(temp_path());
+        $this->setTempDirectory(temp_path())
+            ->setBaseDirectory(base_path());
     }
 
     /**
@@ -67,6 +78,50 @@ class MarketPlaceApi
     {
         $this->key = $key;
         $this->secret = $secret;
+    }
+
+    /**
+     * Set the temp directory used by the UpdateManager. Defaults to `temp_path()` but can be overwritten if required.
+     *
+     * @param string $tempDirectory
+     * @return $this
+     */
+    public function setTempDirectory(string $tempDirectory): static
+    {
+        $this->tempDirectory = $tempDirectory;
+
+        // Ensure temp directory exists
+        if (!File::isDirectory($this->tempDirectory) && File::isWritable($this->tempDirectory)) {
+            File::makeDirectory($this->tempDirectory, recursive: true);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Set the base directory used by the UpdateManager. Defaults to `base_path()` but can be overwritten if required.
+     *
+     * @param string $baseDirectory
+     * @return $this
+     */
+    public function setBaseDirectory(string $baseDirectory): static
+    {
+        $this->baseDirectory = $baseDirectory;
+
+        // Ensure temp directory exists
+        if (!File::isDirectory($this->baseDirectory)) {
+            throw new \RuntimeException('The base directory "' . $this->baseDirectory . '" does not exist.');
+        }
+
+        return $this;
+    }
+
+    /**
+     * Calculates a file path for a file code
+     */
+    protected function getFilePath(string $fileCode): string
+    {
+        return $this->tempDirectory . '/' . md5($fileCode) . '.arc';
     }
 
     /**
@@ -398,6 +453,14 @@ class MarketPlaceApi
         $filePath = $this->getFilePath($fileCode);
 
         $this->extractArchive($filePath, themes_path());
+    }
+
+    /**
+     * Looks up a plugin from the update server.
+     */
+    public function requestPluginDetails(string $name): array
+    {
+        return $this->api->fetch('plugin/detail', ['name' => $name]);
     }
 
     /**
