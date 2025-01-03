@@ -106,13 +106,26 @@ class ExtensionSource
      */
     public function createFiles(): ?static
     {
+        $manager = $this->getExtensionManager();
+
         switch ($this->source) {
             case static::SOURCE_COMPOSER:
+                $manager->renderComponent(
+                    Info::class,
+                    'Requiring composer package: <fg=yellow>' . $this->composerPackage . '</>'
+                );
+
                 try {
                     Composer::require($this->composerPackage);
                 } catch (CommandException $e) {
-                    throw new ApplicationException('Unable to require composer package', previous: $e);
+                    $manager->renderComponent(
+                        Error::class,
+                        'Unable to require composer package, details: <fg=yellow>' . $e->getMessage() . '</>'
+                    );
+                    return null;
                 }
+
+                $manager->renderComponent(Info::class, 'Composer require complete.');
 
                 $info = Composer::show('installed', $this->composerPackage);
                 $this->path = $this->relativePath($info['path']);
@@ -122,11 +135,6 @@ class ExtensionSource
                 if (!in_array($this->type, [static::TYPE_PLUGIN, static::TYPE_THEME])) {
                     throw new ApplicationException("The market place only supports themes and plugins '{$this->type}'");
                 }
-
-                $manager = match ($this->type) {
-                    static::TYPE_THEME => ThemeManager::instance(),
-                    static::TYPE_PLUGIN => PluginManager::instance(),
-                };
 
                 $manager->renderComponent(Info::class, 'Downloading ' . $this->type . ' details...');
 
@@ -162,6 +170,11 @@ class ExtensionSource
             case static::SOURCE_LOCAL:
                 $extensionPath = $this->guessPathFromCode($this->code);
                 if ($this->path !== $extensionPath) {
+                    $manager->renderComponent(
+                        Info::class,
+                        'Moving ' . $this->type . ' to path <fg=yellow>' . $extensionPath . '</>...'
+                    );
+
                     File::moveDirectory($this->path, $extensionPath);
                     $this->path = $extensionPath;
                 }
@@ -264,8 +277,7 @@ class ExtensionSource
                     ? Str::after($path, basename(plugins_path()))
                     : $this->guessCodeFromPlugin($path),
             '/')),
-            static::TYPE_THEME => Str::after($path, themes_path()),
-            static::TYPE_MODULE => Str::after($path, base_path('modules/')),
+            static::TYPE_THEME, static::TYPE_MODULE => basename($path),
             default => null,
         };
     }
