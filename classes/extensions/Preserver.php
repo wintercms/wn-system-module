@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Storage;
 use System\Traits\InteractsWithZip;
 use Winter\Storm\Exception\ApplicationException;
 use Winter\Storm\Foundation\Extension\WinterExtension;
+use Winter\Storm\Support\ModuleServiceProvider;
 use Winter\Storm\Support\Traits\Singleton;
 
 class Preserver
@@ -17,6 +18,7 @@ class Preserver
     public const ROOT_PATH = 'archive';
 
     protected array $classMap = [
+        ModuleServiceProvider::class => 'modules',
         PluginBase::class => 'plugins',
         Theme::class => 'themes',
     ];
