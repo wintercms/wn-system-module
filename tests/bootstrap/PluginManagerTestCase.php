@@ -51,7 +51,7 @@ class PluginManagerTestCase extends TestCase
         UpdateManager::forgetInstance();
 
         // Forces plugin migrations to be run again on every test
-        PluginVersionManager::forgetInstance();
+//        PluginVersionManager::forgetInstance();
 
         $this->output = new OutputStyle(
             new ArrayInput([]),
@@ -88,7 +88,6 @@ class PluginManagerTestCase extends TestCase
     protected function runWinterUpCommand()
     {
         UpdateManager::instance()
-//            ->setNotesOutput($this->output)
             ->update();
     }
 

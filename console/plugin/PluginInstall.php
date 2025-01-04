@@ -45,8 +45,9 @@ class PluginInstall extends Command
      */
     public function handle(): int
     {
+        // @TODO: refactor
         $pluginName = $this->argument('plugin');
-        $manager = UpdateManager::instance()->setNotesOutput($this->output);
+        $manager = UpdateManager::instance();
 
         if (Str::endsWith($pluginName, '.zip')) {
             $packageZip = base_path($pluginName);
