@@ -3,6 +3,8 @@
 namespace System\Classes\Extensions;
 
 use Illuminate\Console\OutputStyle;
+use Illuminate\Console\View\Components\Error;
+use Illuminate\Console\View\Components\Info;
 use Illuminate\Database\Migrations\DatabaseMigrationRepository;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Support\Facades\App;
@@ -111,11 +113,10 @@ class ModuleManager extends ExtensionManager implements ExtensionManagerInterfac
 
                     $versions = $update->getUpgraded()[$composerPackage] ?? null;
 
-                    $this->output->{$versions ? 'info' : 'error'}(
-                        $versions
-                            ? sprintf('Updated module %s (%s) from v%s => v%s', $module, $composerPackage, $versions[0], $versions[1])
-                            : sprintf('Failed to module %s (%s)', $module, $composerPackage)
-                    );
+                    $versions
+                        ? $this->renderComponent(Info::class, sprintf('Updated module %s (%s) from v%s => v%s', $module, $composerPackage, $versions[0], $versions[1]))
+                        : $this->renderComponent(Error::class, sprintf('Failed to module %s (%s)', $module, $composerPackage));
+
                 } elseif (false /* Detect if market */) {
                     Preserver::instance()->store($extension);
                     // @TODO: Update files from market
