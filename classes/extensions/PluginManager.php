@@ -17,11 +17,8 @@ use InvalidArgumentException;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use System\Classes\ComposerManager;
-use System\Classes\Core\MarketPlaceApi;
 use System\Classes\Extensions\Source\ExtensionSource;
 use System\Classes\SettingsManager;
-use System\Classes\UpdateManager;
-use System\Models\Parameter;
 use System\Models\PluginVersion;
 use Winter\Storm\Exception\ApplicationException;
 use Winter\Storm\Exception\SystemException;
@@ -297,9 +294,17 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
 
         foreach ($plugins as $code => $plugin) {
             $pluginName = Lang::get($plugin->pluginDetails()['name']);
+
+            // Plugin record will be null if trying to update before install
+            try {
+                $pluginRecord = $this->getPluginRecord($plugin);
+            } catch (\Throwable $e) {
+                $pluginRecord = null;
+            }
+
             if (!$migrationsOnly) {
                 if (
-                    !$this->getPluginRecord($plugin)->is_frozen
+                    !$pluginRecord?->is_frozen
                     && ($composerPackage = $plugin->getComposerPackageName())
                     && Composer::updateAvailable($composerPackage)
                 ) {
