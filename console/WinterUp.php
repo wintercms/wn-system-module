@@ -46,7 +46,6 @@ class WinterUp extends Command implements Isolatable
         $this->output->writeln('<info>Migrating application and plugins...</info>');
 
         UpdateManager::instance()
-            ->setNotesOutput($this->output)
             ->update();
     }
 }

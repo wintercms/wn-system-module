@@ -2,6 +2,7 @@
 
 use Winter\Storm\Console\Command;
 use System\Classes\UpdateManager;
+use Winter\Storm\Exception\ApplicationException;
 
 /**
  * Console command to tear down the database.
@@ -44,6 +45,7 @@ class WinterDown extends Command
 
     /**
      * Execute the console command.
+     * @throws ApplicationException
      */
     public function handle(): int
     {
@@ -55,7 +57,6 @@ class WinterDown extends Command
         }
 
         UpdateManager::instance()
-            ->setNotesOutput($this->output)
             ->tearDownTheSystem();
 
         return 0;
