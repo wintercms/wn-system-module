@@ -2,6 +2,10 @@
 
 namespace System\Classes\Extensions\Source;
 
+use Cms\Classes\ThemeManager;
+use Illuminate\Support\Facades\File;
+use System\Classes\Extensions\PluginManager;
+use System\Traits\InteractsWithZip;
 use Winter\Storm\Exception\ApplicationException;
 
 class LocalSource extends ExtensionSource
@@ -16,5 +20,44 @@ class LocalSource extends ExtensionSource
         ?string $path = null
     ) {
         parent::__construct(static::SOURCE_LOCAL, $type, $code, $composerPackage, $path);
+    }
+
+    /**
+     * @throws ApplicationException
+     */
+    public static function fromZip(string $path): array
+    {
+        if (!File::exists($path)) {
+            throw new ApplicationException('Zip not found');
+        }
+
+        $dir = temp_path(time());
+
+        if (!File::exists($dir)) {
+            File::makeDirectory($dir);
+        }
+
+        (new class {
+            use InteractsWithZip;
+        })->extractArchive($path, $dir);
+
+        $plugins = PluginManager::instance()->findPluginsInPath($dir);
+        $themes = ThemeManager::instance()->findThemesInPath($dir);
+
+        if (!count($plugins) && !count($themes)) {
+            throw new ApplicationException('Could not detect any plugins or themes in zip');
+        }
+
+        $sources = [];
+
+        foreach ($plugins as $code => $path) {
+            $sources = new static(static::TYPE_PLUGIN, code: $code, path: $path);
+        }
+
+        foreach ($themes as $code => $path) {
+            $sources = new static(static::TYPE_THEME, code: $code, path: $path);
+        }
+
+        return $sources;
     }
 }
