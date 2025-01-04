@@ -276,7 +276,8 @@ class ExtensionSource
                 str_starts_with($path, plugins_path())
                     ? Str::after($path, basename(plugins_path()))
                     : $this->guessCodeFromPlugin($path),
-            '/')),
+                '/'
+            )),
             static::TYPE_THEME, static::TYPE_MODULE => basename($path),
             default => null,
         };

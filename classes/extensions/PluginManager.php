@@ -330,9 +330,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
                             'Failed to update plugin %s (%s)',
                             $pluginName,
                             $code
-                        )
-                    );
-
+                        ));
                 } elseif (false /* Detect if market */) {
                     Preserver::instance()->store($plugin);
                     // @TODO: Update files from market

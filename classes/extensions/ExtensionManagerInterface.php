@@ -44,7 +44,7 @@ interface ExtensionManagerInterface
      *
      * @throws ApplicationException If the installation fails
      */
-    public function install(ExtensionSource|WinterExtension|string $extension ): WinterExtension;
+    public function install(ExtensionSource|WinterExtension|string $extension): WinterExtension;
 
     /**
      * Validates if an extension is installed or not
