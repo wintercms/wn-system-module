@@ -698,11 +698,6 @@ class ServiceProvider extends ModuleServiceProvider implements WinterExtension
         return __DIR__;
     }
 
-    public function getVersion(): string
-    {
-        // TODO: Implement extensionVersion() method.
-    }
-
     public function getIdentifier(): string
     {
         return 'System';
