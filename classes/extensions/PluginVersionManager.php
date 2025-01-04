@@ -495,7 +495,7 @@ class PluginVersionManager
         $updateFile = $this->pluginManager->getPluginPath($code) . '/updates/' . $script;
 
         if (!File::isFile($updateFile)) {
-            $this->write(Error::class, sprintf('Migration file "%s" not found.', $script));
+            $this->pluginManager->renderComponent(Error::class, sprintf('Migration file "%s" not found.', $script));
             return;
         }
 
