@@ -5,6 +5,7 @@ namespace System\Classes\Extensions;
 use Illuminate\Console\OutputStyle;
 use Illuminate\Console\View\Components\Error;
 use Illuminate\Console\View\Components\Info;
+use Illuminate\Console\View\Components\Warn;
 use Illuminate\Database\Migrations\DatabaseMigrationRepository;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Support\Facades\App;
@@ -95,7 +96,9 @@ class ModuleManager extends ExtensionManager implements ExtensionManagerInterfac
             $this->output->info('Migration table created');
         }
 
-        if (!$migrationsOnly && !Config::get('cms.disableCoreUpdates')) {
+        if (Config::get('cms.disableCoreUpdates', false)) {
+            $this->renderComponent(Warn::class, 'Not checking for core updates as `cms.disableCoreUpdates` is enabled');
+        } elseif (!$migrationsOnly) {
             foreach ($modules as $module) {
                 $extension = $this->get($module);
                 if (
