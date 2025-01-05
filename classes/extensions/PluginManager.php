@@ -1496,7 +1496,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
      * Disables the provided plugin using the provided flag (defaults to static::DISABLED_BY_USER)
      * @deprecated
      */
-    public function disablePlugin(PluginBase|string $plugin, string|bool $flag = self::DISABLED_BY_USER): bool
+    public function disablePlugin(PluginBase|string $plugin, string|bool $flag = self::DISABLED_BY_USER): ?bool
     {
         return $this->disable($plugin, $flag);
     }
@@ -1505,7 +1505,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
      * Enables the provided plugin using the provided flag (defaults to static::DISABLED_BY_USER)
      * @deprecated
      */
-    public function enablePlugin(PluginBase|string $plugin, $flag = self::DISABLED_BY_USER): bool
+    public function enablePlugin(PluginBase|string $plugin, $flag = self::DISABLED_BY_USER): ?bool
     {
         return $this->enable($plugin, $flag);
     }
