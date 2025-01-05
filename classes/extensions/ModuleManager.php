@@ -52,7 +52,7 @@ class ModuleManager extends ExtensionManager implements ExtensionManagerInterfac
 
     public function create(string $extension): WinterExtension
     {
-        throw new ApplicationException('Support for creating extensions needs implementing');
+        throw new ApplicationException('Support for creating modules is not implemented.');
     }
 
     public function install(WinterExtension|ExtensionSource|string $extension): WinterExtension
@@ -88,7 +88,7 @@ class ModuleManager extends ExtensionManager implements ExtensionManagerInterfac
     {
         $modules = $this->getModuleList($extension);
 
-        $firstUp = UpdateManager::instance()->isSystemSetup();
+        $firstUp = !UpdateManager::instance()->isSystemSetup();
 
         if ($firstUp) {
             $this->repository->createRepository();

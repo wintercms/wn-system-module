@@ -6,7 +6,7 @@ use Backend\Facades\Backend;
 use Exception;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Lang;
-use October\Rain\Exception\ApplicationException;
+use Winter\Storm\Exception\ApplicationException;
 use System\Classes\Core\MarketPlaceApi;
 use System\Models\Parameter;
 use Winter\Storm\Support\Facades\Flash;

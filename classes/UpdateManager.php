@@ -46,7 +46,7 @@ class UpdateManager
 
     public function isSystemSetup(): bool
     {
-        return !Schema::hasTable($this->getMigrationTableName());
+        return Schema::hasTable($this->getMigrationTableName());
     }
 
     public function getMigrationTableName(): string
