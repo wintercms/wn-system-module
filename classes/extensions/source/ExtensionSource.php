@@ -289,18 +289,13 @@ class ExtensionSource
      */
     protected function guessCodeFromPlugin(string $path): string
     {
-        // Get all files in the provided path
-        $files = array_combine(array_map('strtolower', $files = scandir($path)), $files);
+        $plugins = PluginManager::instance()->findPluginsInPath($path);
 
-        // If there is no plugin.php in any casing, then throw
-        if (!isset($files['plugin.php'])) {
+        if (count($plugins) !== 1) {
             throw new ApplicationException(sprintf('Unable to locate plugin file in path: "%s"', $path));
         }
 
-        // Create a full path to the plugin.php file
-        $file = $path . DIRECTORY_SEPARATOR . $files['plugin.php'];
-
-        return PluginManager::instance()->extractPluginCodeFromFile($file);
+        return array_keys($plugins)[0];
     }
 
     protected function relativePath(string $path): string
