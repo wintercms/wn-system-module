@@ -360,7 +360,7 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
                 throw new ApplicationException(Lang::get('system::lang.plugins.replace.multi_install_error'));
             }
             foreach ($replaces as $replace) {
-                $this->versionManager()->replacePlugin($plugin, $replace);
+                $this->versionManager->replacePlugin($plugin, $replace);
             }
         }
 
