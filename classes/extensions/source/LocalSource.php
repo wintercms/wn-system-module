@@ -23,12 +23,12 @@ class LocalSource extends ExtensionSource
     }
 
     /**
-     * @throws ApplicationException
+     * @throws ApplicationException if the provided path doesn't exist
      */
     public static function fromZip(string $path): array
     {
         if (!File::exists($path)) {
-            throw new ApplicationException('Zip not found');
+            throw new ApplicationException("$path doesn't exist");
         }
 
         $dir = temp_path(time());
@@ -51,11 +51,11 @@ class LocalSource extends ExtensionSource
         $sources = [];
 
         foreach ($plugins as $code => $path) {
-            $sources = new static(static::TYPE_PLUGIN, code: $code, path: $path);
+            $sources[] = new static(static::TYPE_PLUGIN, code: $code, path: $path);
         }
 
         foreach ($themes as $code => $path) {
-            $sources = new static(static::TYPE_THEME, code: $code, path: $path);
+            $sources[] = new static(static::TYPE_THEME, code: $code, path: $path);
         }
 
         return $sources;
