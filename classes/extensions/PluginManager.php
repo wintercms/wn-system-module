@@ -881,20 +881,30 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
 
         foreach ($iterator as $file) {
             if ($file->isFile() && $file->getFilename() === 'Plugin.php') {
-                // Attempt to extract the plugin's code
-                if (!preg_match('/namespace (.+?);/', file_get_contents($file->getRealPath()), $match)) {
-                    continue;
-                }
-
-                $code = str_replace('\\', '.', $match[1]);
-
-                if (str_contains($code, '.')) {
+                if ($code = $this->extractPluginCodeFromFile($file->getRealPath())) {
                     $pluginFiles[$code] = $file->getPathname();
                 }
             }
         }
 
         return $pluginFiles;
+    }
+
+    /**
+     * Attempt to extract the plugin's code from a file
+     *
+     * @param string $filePath
+     * @return string|null
+     */
+    public function extractPluginCodeFromFile(string $filePath): ?string
+    {
+        if (!preg_match('/namespace (.+?);/', file_get_contents($filePath), $match)) {
+            return null;
+        }
+
+        $code = str_replace('\\', '.', $match[1]);
+
+        return str_contains($code, '.') ? $code : null;
     }
 
     /**

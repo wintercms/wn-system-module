@@ -300,48 +300,7 @@ class ExtensionSource
         // Create a full path to the plugin.php file
         $file = $path . DIRECTORY_SEPARATOR . $files['plugin.php'];
 
-        // The following will create a child process to parse the plugins namespace, this is done to prevent pollution
-        // of the current process (i.e. namespaces being incorrectly registered to paths where they won't be in the
-        // future post installation)
-
-        // Create a named pipe
-        $pipeName = 'classTestPipe';
-        posix_mkfifo($pipeName, 0777);
-
-        // Fork the process
-        if (!pcntl_fork()) {
-            // Open the pipe now, so we can signal failure by closing it in case of a parse error
-            $pipe = fopen($pipeName, 'w');
-            try {
-                require $file;
-            } catch (\Throwable $e) {
-                // Probably a parse error, close the pipe to tell the parent that something went wrong
-                fclose($pipe);
-                exit(1);
-            }
-            // Get all declared classes
-            $classes = get_declared_classes();
-            // Reflect on the last registered class, i.e. the one we loaded with require above
-            $reflect = new \ReflectionClass(array_pop($classes));
-            // Send the namespace over the pipe to the parent process
-            fwrite($pipe, $reflect->getNamespaceName());
-            fclose($pipe);
-            exit(0);
-        }
-
-        // Read the pipe, this is blocking and will wait for the child to close the pipe handle in it's own process
-        $pipe = fopen($pipeName, 'r');
-        // Read the namespace from the pipe
-        $namespace = fread($pipe, 4096);
-        // Close and clean up
-        fclose($pipe);
-        unlink($pipeName);
-
-        if (!$namespace) {
-            throw new ApplicationException(sprintf('Unable to detect plugin namespace from `%s`. Is the file valid?', $file));
-        }
-
-        return PluginManager::instance()->getIdentifier($namespace);
+        return PluginManager::instance()->extractPluginCodeFromFile($file);
     }
 
     protected function relativePath(string $path): string
