@@ -272,7 +272,6 @@ class PluginManager extends ExtensionManager implements ExtensionManagerInterfac
     }
 
     /**
-     * @throws SystemException
      * @throws ApplicationException
      */
     public function update(WinterExtension|string|null $extension = null, bool $migrationsOnly = false): ?bool
