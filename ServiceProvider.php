@@ -692,14 +692,4 @@ class ServiceProvider extends ModuleServiceProvider implements WinterExtension
     {
         View::share('appName', Config::get('app.name'));
     }
-
-    public function getPath(): string
-    {
-        return __DIR__;
-    }
-
-    public function getIdentifier(): string
-    {
-        return 'System';
-    }
 }
