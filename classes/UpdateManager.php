@@ -56,34 +56,33 @@ class UpdateManager
      */
     public function check(bool $force = false): int
     {
-        // Already know about updates, never retry.
-        if (($oldCount = Parameter::get('system::update.count')) > 0) {
-            return $oldCount;
-        }
+        $updateCount = Parameter::get('system::update.count');
 
         // Retry period not passed, skipping.
         if (
             !$force
             && ($retryTimestamp = Parameter::get('system::update.retry'))
             && Carbon::createFromTimeStamp($retryTimestamp)->isFuture()
+            && $updateCount > 0
         ) {
-            return $oldCount;
+            return $updateCount;
         }
 
         try {
-            $result = $this->requestUpdateList();
-            $newCount = array_get($result, 'update', 0);
+            $updateCount = array_reduce(array_values($this->availableUpdates()), function (int $carry, array $updates) {
+                return $carry + count($updates);
+            }, 0);
         } catch (Exception $ex) {
-            $newCount = 0;
+            $updateCount = 0;
         }
 
         /*
          * Remember update count, set retry date
          */
-        Parameter::set('system::update.count', $newCount);
+        Parameter::set('system::update.count', $updateCount);
         Parameter::set('system::update.retry', Carbon::now()->addHours(24)->timestamp);
 
-        return $newCount;
+        return $updateCount;
     }
 
     public function availableUpdates(): array

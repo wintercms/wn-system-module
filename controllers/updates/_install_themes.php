@@ -31,41 +31,7 @@
 
                 <h4 class="section-header">
                     <a href="<?= Backend::url('cms/themes') ?>"><?= e(trans('system::lang.themes.installed')) ?></a>
-                    <small>(<span class="product-counter"><?= count($installedThemes) ?></span>)</small>
                 </h4>
-
-                <?php if (!count($installedThemes)): ?>
-                    <div class="product-list-empty">
-                        <p><?= e(trans('system::lang.themes.no_themes')) ?></p>
-                    </div>
-                <?php else: ?>
-                    <ul class="product-list theme-list">
-                        <?php foreach ($installedThemes as $theme): ?>
-
-                            <li data-code="<?= $theme['code'] ?>">
-                                <div class="image">
-                                    <img src="<?= $theme['image'] ?>" alt="">
-                                </div>
-                                <div class="details">
-                                    <h4><?= $theme['name'] ?></h4>
-                                    <p><?= e(trans('cms::lang.theme.by_author', ['name' => $theme['author']])) ?></p>
-                                </div>
-                                <button
-                                    type="button"
-                                    class="close"
-                                    aria-hidden="true"
-                                    data-request="onRemoveTheme"
-                                    data-request-data="code: '<?= $theme['dirName'] ?>'"
-                                    data-request-confirm="<?= e(trans('system::lang.themes.remove_confirm')) ?>"
-                                    data-stripe-load-indicator>
-                                    &times;
-                                </button>
-                            </li>
-
-                        <?php endforeach ?>
-                    </ul>
-                <?php endif ?>
-
             </div>
 
         </div>
@@ -78,7 +44,7 @@
                     <div
                         id="suggestedThemes"
                         class="suggested-products suggested-themes"
-                        data-handler="onGetPopularThemes"
+                        data-handler="onGetMarketplaceThemes"
                         data-view="theme/suggestion"></div>
                 </div>
             </div>
@@ -94,7 +60,7 @@
         <a
             data-control="popup"
             data-handler="onInstallTheme"
-            data-request-data="code: '{{code}}'"
+            data-request-data="code: '{{popular.code}}'"
             href="javascript:;">
             <div class="image"><img src="{{image}}" alt=""></div>
             <div class="details">

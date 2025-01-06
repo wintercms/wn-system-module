@@ -4,12 +4,19 @@ namespace System\Controllers\Updates\Traits;
 
 use Backend\Widgets\Form;
 use Exception;
+use Illuminate\Console\OutputStyle;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use System\Classes\Core\MarketPlaceApi;
 use System\Classes\Extensions\PluginManager;
+use System\Classes\Extensions\Source\ComposerSource;
+use System\Classes\Extensions\Source\ExtensionSource;
 use System\Classes\UpdateManager;
 use System\Models\PluginVersion;
 use Winter\Storm\Database\Model;
@@ -109,13 +116,17 @@ trait ManagesPlugins
         return $plugins;
     }
 
-    public function onGetPopularPlugins(): array
+    public function onGetMarketplacePlugins(): array
     {
         return [
-            'result' => $this->filterPopularProducts(
-                MarketPlaceApi::instance()->requestPopularProducts('plugin'),
-                $this->getInstalledPlugins()
-            )
+            'result' => MarketPlaceApi::instance()->getProducts()['plugins']
+        ];
+    }
+
+    public function onGetMarketplaceThemes(): array
+    {
+        return [
+            'result' => MarketPlaceApi::instance()->getProducts()['themes']
         ];
     }
 
@@ -237,45 +248,30 @@ trait ManagesPlugins
      *
      * @throws ApplicationException If validation fails or the plugin cannot be installed
      */
-    public function onInstallPlugin(): string
+    public function onInstallPlugin(): StreamedResponse
     {
-        try {
-            if (!$code = trim(post('code'))) {
-                throw new ApplicationException(Lang::get('system::lang.install.missing_plugin_name'));
-            }
-
-            $result = MarketPlaceApi::instance()->request(MarketPlaceApi::REQUEST_PLUGIN_DETAIL, $code);
-
-            if (!isset($result['code']) || !isset($result['hash'])) {
-                throw new ApplicationException(Lang::get('system::lang.server.response_invalid'));
-            }
-
-            $name = $result['code'];
-            $hash = $result['hash'];
-            $plugins = [$name => $hash];
-            $plugins = $this->appendRequiredPlugins($plugins, $result);
-
-            /*
-             * Update steps
-             */
-            $updateSteps = $this->buildUpdateSteps(null, $plugins, [], true);
-
-            /*
-             * Finish up
-             */
-            $updateSteps[] = [
-                'code'  => 'completeInstall',
-                'label' => Lang::get('system::lang.install.install_completing'),
-            ];
-
-            $this->vars['updateSteps'] = $updateSteps;
-
-            return $this->makePartial('execute');
+        if (!$code = trim(post('package'))) {
+            throw new ApplicationException(Lang::get('system::lang.install.missing_plugin_name'));
         }
-        catch (Exception $ex) {
-            $this->handleError($ex);
-            return $this->makePartial('plugin_form');
-        }
+
+        return Response::stream(function () use ($code) {
+            PluginManager::instance()->setOutput(new OutputStyle(new ArrayInput([]), new class extends BufferedOutput {
+                protected function doWrite(string $message, bool $newline)
+                {
+                    echo 'event: message' . "\n";
+                    echo 'data: ' . json_encode(['content' => trim($message)]) . "\n\n";
+                    flush();
+                    ob_flush();
+                }
+            }));
+
+            (new ComposerSource(ExtensionSource::TYPE_PLUGIN, composerPackage: $code))
+                ->install();
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'X-Accel-Buffering' => 'no'
+        ]);
     }
 
     /**

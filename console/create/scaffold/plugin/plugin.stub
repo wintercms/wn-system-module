@@ -4,7 +4,7 @@ namespace {{ plugin_namespace }};
 
 use Backend;
 use Backend\Models\UserRole;
-use System\Classes\PluginBase;
+use System\Classes\Extensions\PluginBase;
 
 /**
  * {{ name }} Plugin Information File

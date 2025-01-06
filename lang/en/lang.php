@@ -89,7 +89,7 @@ return [
     ],
     'themes' => [
         'install' => 'Install themes',
-        'search' => 'search themes to install...',
+        'search' => 'Search themes to install...',
         'installed' => 'Installed themes',
         'no_themes' => 'There are no themes installed from the marketplace.',
         'recommended' => 'Recommended',
@@ -113,7 +113,7 @@ return [
         'install' => 'Install plugins',
         'upload' => 'Upload Plugin',
         'install_products' => 'Install products',
-        'search' => 'search plugins to install...',
+        'search' => 'Search plugins to install...',
         'installed' => 'Installed plugins',
         'no_plugins' => 'There are no plugins installed from the marketplace.',
         'recommended' => 'Recommended',

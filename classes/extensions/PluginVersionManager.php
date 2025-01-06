@@ -661,4 +661,16 @@ class PluginVersionManager
         }));
         return $lastHistory ? $lastHistory->detail : '';
     }
+
+    /**
+     * Flushes local cache
+     *
+     * @return $this
+     */
+    public function forgetCache(): static
+    {
+//        unset($this->databaseHistory, $this->databaseVersions, $this->fileVersions);
+
+        return $this;
+    }
 }

@@ -40,6 +40,9 @@ class ExtensionSource
 
     protected string $status = 'uninstalled';
 
+    /**
+     * @throws ApplicationException
+     */
     public function __construct(
         public string $source,
         public string $type,
@@ -266,7 +269,6 @@ class ExtensionSource
     }
 
     /**
-     * @throws \ReflectionException
      * @throws ApplicationException
      */
     protected function guessCodeFromPath(string $path): ?string
@@ -284,7 +286,6 @@ class ExtensionSource
     }
 
     /**
-     * @throws \ReflectionException
      * @throws ApplicationException
      */
     protected function guessCodeFromPlugin(string $path): string

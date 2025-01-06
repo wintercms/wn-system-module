@@ -9,6 +9,7 @@ use System\Models\Parameter;
 use System\Traits\InteractsWithZip;
 use Winter\Storm\Exception\ApplicationException;
 use Winter\Storm\Network\Http as NetworkHttp;
+use Winter\Storm\Packager\Composer;
 use Winter\Storm\Support\Facades\Config;
 use Winter\Storm\Support\Facades\File;
 use Winter\Storm\Support\Facades\Http;
@@ -26,6 +27,7 @@ class MarketPlaceApi
     use InteractsWithZip;
 
     public const PRODUCT_CACHE_KEY = 'system-updates-product-details';
+    public const PRODUCT_FETCH_CACHE_KEY = 'marketplace.api.products';
 
     public const REQUEST_PLUGIN_DETAIL = 'plugin/detail';
     public const REQUEST_PLUGIN_CONTENT = 'plugin/content';
@@ -486,5 +488,61 @@ class MarketPlaceApi
         $filePath = $this->getFilePath($fileCode);
 
         $this->extractArchive($filePath, plugins_path());
+    }
+
+
+    ////////////////////////////////////////////////
+    /// @TODO: Move this to the marketplace api
+    ////////////////////////////////////////////////
+
+    public function getProducts(): array
+    {
+        return Cache::remember(static::PRODUCT_FETCH_CACHE_KEY, Carbon::now()->addMinutes(5), function () {
+            return [
+                'plugins' => $this->getPackageType('winter-plugin'),
+                'themes' => $this->getPackageType('winter-theme'),
+            ];
+        });
+    }
+
+    protected function getPackageType(string $type): array
+    {
+        $installed = Composer::getWinterPackageNames();
+
+        $packages = array_map(function (array $package) use ($installed) {
+            // This is scuffed, store the composer name as "package"
+            $package['package'] = $package['name'];
+            // Then guess a winter name from the package name (this will need to be handled by the market)
+            $package['name'] = implode('.', array_map(function (string $str) {
+                return str_replace(' ', '', ucwords(str_replace(['wn-', '-plugin', '-'], ['', '', ' '], $str)));
+            }, explode('/', $package['name'])));
+            // Check if the package is installed, should probably happen somewhere else
+            $package['installed'] = in_array($package['package'], $installed);
+            // Grab the package image, for now this will do
+            $package['icon'] = 'https://picsum.photos/200?a=' . md5($package['name']);
+            return $package;
+        }, Composer::listPackages($type));
+
+        usort($packages, function ($a, $b) {
+            return $b['favers'] <=> $a['favers'];
+        });
+
+        $popular = array_slice($packages, 0, 9);
+
+        usort($packages, function ($a, $b) {
+            return str_starts_with($b['package'], 'winter/');
+        });
+
+        $featured = array_slice($packages, 0, 9);
+
+        usort($packages, function ($a, $b) {
+            return $b['downloads'] <=> $a['downloads'];
+        });
+
+        return [
+            'popular' => $popular,
+            'featured' => $featured,
+            'all' => $packages
+        ];
     }
 }

@@ -58,7 +58,7 @@ class Updates extends Controller
     {
         parent::__construct();
 
-        $this->addJs('/modules/system/assets/js/updates/updates.js', 'core');
+        $this->addJs('/modules/system/controllers/updates/assets/dist/updates.js', 'core');
         $this->addCss('/modules/system/assets/css/updates/updates.css', 'core');
 
         BackendMenu::setContext('Winter.System', 'system', 'updates');
@@ -101,8 +101,7 @@ class Updates extends Controller
             $this->addCss('/modules/system/assets/css/updates/install.css', 'core');
 
             $this->vars['activeTab'] = $tab ?: 'plugins';
-            $this->vars['installedPlugins'] = $this->getInstalledPlugins();
-            $this->vars['installedThemes'] = $this->getInstalledThemes();
+
             $this->vars['packageUploadWidget'] = $this->getPackageUploadWidget($tab === 'themes' ? 'theme' : 'plugin');
         } catch (Exception $ex) {
             $this->handleError($ex);
