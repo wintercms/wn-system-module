@@ -5,4 +5,3 @@
     ></plugin-updates>
 </div>
 
-
