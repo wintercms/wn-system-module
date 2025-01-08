@@ -68,8 +68,9 @@ class PluginVersionManager
     {
         $code = is_string($plugin) ? $plugin : $this->pluginManager->getIdentifier($plugin);
 
+        // No version file, no db changes required
         if (!$this->hasVersionFile($code)) {
-            return false;
+            return null;
         }
 
         $currentVersion = $this->getLatestFileVersion($code);
