@@ -1,3 +1,2 @@
-dist
-src/*.vue
-
+dist/*.js
+*.vue
