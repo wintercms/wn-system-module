@@ -58,7 +58,10 @@ class Updates extends Controller
     {
         parent::__construct();
 
+        // New
         $this->addJs('/modules/system/controllers/updates/assets/dist/updates.js', 'core');
+        // Old
+        $this->addJs('/modules/system/assets/js/updates/updates.js', 'core');
         $this->addCss('/modules/system/assets/css/updates/updates.css', 'core');
 
         BackendMenu::setContext('Winter.System', 'system', 'updates');
