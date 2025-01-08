@@ -12,12 +12,11 @@
                     </div>
                 </div>
                 <div class="absolute">
-                    <button v-if="!product.installed"
+                    <button v-if="!product.installed && !installing"
                             class="btn btn-info"
-                            data-control="popup"
-                            data-handler="onInstallPlugin"
-                            :data-request-data="`package: '${product.package}'`"
+                            @click="install()"
                     >Install</button>
+                    <div v-if="installing" class="installing"></div>
                     <p v-if="product.installed" class="text-muted">This {{type}} is installed.</p>
                 </div>
             </div>
@@ -47,6 +46,76 @@
 <script>
 export default {
     props: ['product', 'type'],
+    data: () => {
+        return {
+            installing: false
+        }
+    },
+    methods: {
+        async install() {
+            this.installing = true;
+
+            this.$request('onInstallPlugin', {
+                data: {
+                    package: this.product.package
+                },
+                success: (response) => {
+                    $.popup({
+                        size: 'installer-popup',
+                        content: `
+                            <div class="modal-header">
+                                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                                <h4 class="modal-title">Installing ${this.product.name}</h4>
+                            </div>
+                            <div class="modal-body"></div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-default" data-dismiss="modal">Blue Pill</button>
+                                <button type="button" class="btn btn-primary" data-dismiss="modal">Red Pill</button>
+                            </div>
+                        `
+                    });
+
+                    const popup = document.querySelector('.size-installer-popup .modal-body');
+
+                    const prepareMessage = (str) => {
+                        return `<div class="install-message">${
+                            str.split("\n").filter((line) => line.indexOf('FINISHED:') === 0 ? false : !!line).map((line) => {
+                                ['INFO', 'ERROR'].forEach((status) => {
+                                    if (line.indexOf(status) === 0) {
+                                        line = `
+                                            <div class="message-line">
+                                                <span class="message-${status.toLowerCase()}">${status}</span> <pre>${line.substring(status.length + 1)}</pre>
+                                            </div>
+                                        `;
+                                    }
+                                });
+
+                                return line;
+                            }).join("\n")
+                        }</div>`;
+                    };
+
+                    const checkStatus = () => {
+                        this.$request('onInstallProductStatus', {
+                            data: {
+                                install_key: response.install_key
+                            },
+                            success: (statusResponse) => {
+                                popup.innerHTML = prepareMessage(statusResponse.data);
+
+                                if (!statusResponse.done) {
+                                    return setTimeout(checkStatus, 500);
+                                }
+
+                                this.installing = false;
+                            }
+                        })
+                    };
+                    checkStatus();
+                }
+            });
+        }
+    }
 };
 </script>
 <style>
@@ -145,5 +214,38 @@ export default {
 }
 .product-footer .stars, .product-footer .github {
     margin-right: 7px;
+}
+.installing:after {
+    content: ' ';
+    display: block;
+    background-size: 50px 50px;
+    background-repeat: no-repeat;
+    background-position: 50% 50%;
+    background-image: url(/modules/system/assets/ui/images/loader-transparent.svg);
+    animation: spin 1s linear infinite;
+    width: 50px;
+    height: 50px;
+    margin: 0;
+}
+.install-message span, .install-message pre {
+    display: inline;
+    text-wrap: wrap;
+}
+.install-message .message-info {
+    color: #0EA804;
+}
+.install-message .message-error {
+    color: #c23c3c;
+}
+
+.install-message {
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 6px;
+    background: #121f2c;
+    color: #f5f5f5
+}
+.message-line {
+    margin-bottom: 5px;
 }
 </style>

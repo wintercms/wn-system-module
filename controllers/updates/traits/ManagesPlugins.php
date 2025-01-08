@@ -6,9 +6,12 @@ use Backend\Widgets\Form;
 use Exception;
 use Illuminate\Console\OutputStyle;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
@@ -28,6 +31,8 @@ use Winter\Storm\Support\Str;
 
 trait ManagesPlugins
 {
+    public string $cachePrefix = 'winter-x-install-';
+
     /**
      * Plugin manage controller
      */
@@ -248,30 +253,64 @@ trait ManagesPlugins
      *
      * @throws ApplicationException If validation fails or the plugin cannot be installed
      */
-    public function onInstallPlugin(): StreamedResponse
+    public function onInstallPlugin(): array
     {
         if (!$code = trim(post('package'))) {
             throw new ApplicationException(Lang::get('system::lang.install.missing_plugin_name'));
         }
 
-        return Response::stream(function () use ($code) {
-            PluginManager::instance()->setOutput(new OutputStyle(new ArrayInput([]), new class extends BufferedOutput {
-                protected function doWrite(string $message, bool $newline)
-                {
-                    echo 'event: message' . "\n";
-                    echo 'data: ' . json_encode(['content' => trim($message)]) . "\n\n";
-                    flush();
-                    ob_flush();
-                }
-            }));
+        $key = base64_encode($this->cachePrefix . Session::getId() . md5(time() . $code));
 
-            (new ComposerSource(ExtensionSource::TYPE_PLUGIN, composerPackage: $code))
-                ->install();
-        }, 200, [
-            'Content-Type' => 'text/event-stream',
-            'Cache-Control' => 'no-cache',
-            'X-Accel-Buffering' => 'no'
-        ]);
+        App::terminating(function () use ($code, $key) {
+            $output = new class extends BufferedOutput {
+                protected string $key;
+
+                protected function doWrite(string $message, bool $newline): void
+                {
+                    Cache::put($this->key, Cache::get($this->key, '') . trim($message) . ($newline ? "\n" : ''));
+                }
+
+                public function setKey(string $key): void
+                {
+                    $this->key = $key;
+                }
+            };
+
+            $output->setKey($key);
+
+            PluginManager::instance()->setOutput(new OutputStyle(new ArrayInput([]), $output));
+
+            try {
+                $response = (new ComposerSource(ExtensionSource::TYPE_PLUGIN, composerPackage: $code))
+                    ->install();
+            } catch (\Throwable $e) {
+                $response = null;
+            } finally {
+                Cache::put($key, Cache::get($key, '') . 'FINISHED:' . ($response ? 'SUCCESS' : 'FAILED'));
+            }
+        });
+
+        return [
+            'install_key' => $key
+        ];
+    }
+
+    public function onInstallProductStatus(): array
+    {
+        if (!$key = trim(post('install_key'))) {
+            throw new ApplicationException(Lang::get('system::lang.install.missing_plugin_name'));
+        }
+
+        if (!str_starts_with(base64_decode($key), $this->cachePrefix . Session::getId())) {
+            throw new ApplicationException(Lang::get('system::lang.server.response_invalid'));
+        }
+
+        $data = Cache::get($key, '');
+
+        return [
+            'done' => !$data || str_contains($data, 'FINISHED:SUCCESS') || str_contains($data, 'FINISHED:FAILED'),
+            'data' => $data
+        ];
     }
 
     /**

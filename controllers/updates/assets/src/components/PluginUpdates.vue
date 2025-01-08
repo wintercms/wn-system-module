@@ -44,7 +44,7 @@
                 </button>
             </div>
         </div>
-        <div class="products row m-t-md">
+        <div class="products row m-t-sm">
             <Product v-for="plugin in activePlugins" :product="plugin" type="plugin"></Product>
         </div>
     </div>
