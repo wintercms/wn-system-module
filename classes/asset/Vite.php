@@ -14,11 +14,13 @@ class Vite extends LaravelVite
      *
      * @param string|array $entrypoints The list of entry points for Vite
      * @param string|null $package The package name of the plugin or theme
+     * @param string|null $buildDirectory The Vite build directory
+     *
      * @return HtmlString
      *
      * @throws SystemException
      */
-    public function __invoke($entrypoints, $package = null)
+    public function __invoke($entrypoints, $package = null, $buildDirectory = null)
     {
         if (!$package) {
             throw new \InvalidArgumentException('A package must be passed');
@@ -32,7 +34,7 @@ class Vite extends LaravelVite
         }
 
         $this->useHotFile(base_path($compilableAssetPackage['path'] . '/assets/dist/hot'));
-        return parent::__invoke($entrypoints, $compilableAssetPackage['path'] . '/assets/dist');
+        return parent::__invoke($entrypoints, $compilableAssetPackage['path'] . ($buildDirectory ?? '/assets/dist'));
     }
 
     /**
@@ -40,11 +42,12 @@ class Vite extends LaravelVite
      *
      * @param string|array $entrypoints The list of entry points for Vite
      * @param string $package The package name of the plugin or theme
+     * @param string|null $buildDirectory The Vite build directory
      *
      * @throws SystemException
      */
-    public static function tags(array|string $entrypoints, string $package): HtmlString
+    public static function tags(array|string $entrypoints, string $package, ?string $buildDirectory = null): HtmlString
     {
-        return App::make(\Illuminate\Foundation\Vite::class)($entrypoints, $package);
+        return App::make(\Illuminate\Foundation\Vite::class)($entrypoints, $package, $buildDirectory);
     }
 }
