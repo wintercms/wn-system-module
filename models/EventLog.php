@@ -38,6 +38,7 @@ class EventLog extends Model
             class_exists('Model') &&
             Model::getConnectionResolver() &&
             App::hasDatabase() &&
+            LogSetting::isConfigured() &&
             LogSetting::get('log_events')
         );
     }
