@@ -37,8 +37,7 @@ class EventLog extends Model
             !defined('WINTER_NO_EVENT_LOGGING') &&
             class_exists('Model') &&
             Model::getConnectionResolver() &&
-            App::hasDatabase() &&
-            LogSetting::isConfigured() &&
+            static::hasDatabaseTable() &&
             LogSetting::get('log_events')
         );
     }
