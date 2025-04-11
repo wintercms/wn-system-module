@@ -97,7 +97,7 @@ abstract class PluginTestCase extends TestCase
 
         // Reload module routes
         foreach (Config::get('cms.loadModules', []) as $module) {
-            include base_path("modules/$module/routes.php");
+            include base_path("modules/" . strtolower($module) . "/routes.php");
         }
 
         // Disable mailing
